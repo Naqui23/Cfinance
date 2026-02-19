@@ -1,0 +1,2544 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CFD Analyzer Pro - Sinais, Gestão de Risco & Trading Journal</title>
+    <meta name="description" content="Ferramenta educativa para análise de CFDs. 75% das contas retail perdem dinheiro.">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #dc3545;
+            --dark: #1a1a2e;
+            --light: #f8f9fa;
+            --card-bg: #ffffff;
+            --text: #1f2937;
+            --border: #e5e7eb;
+            --shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        body.dark-mode {
+            --dark: #0f0f1a;
+            --light: #1a1a2e;
+            --card-bg: #16213e;
+            --text: #e5e7eb;
+            --border: #0f3460;
+            --shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            background: var(--light);
+            color: var(--text);
+            line-height: 1.6;
+            transition: all 0.3s ease;
+        }
+
+        /* 🔴 RISK WARNING STICKY */
+        .risk-warning-sticky {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            padding: 12px 20px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 9999;
+            font-size: 14px;
+            font-weight: 600;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .risk-warning-sticky a {
+            color: #fff;
+            text-decoration: underline;
+        }
+
+        /* Header */
+        header {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 15px 20px;
+            position: sticky;
+            top: 52px;
+            z-index: 1000;
+            box-shadow: var(--shadow);
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        button.secondary {
+            background: var(--light);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        button.danger {
+            background: var(--danger);
+        }
+
+        button.success {
+            background: var(--success);
+        }
+
+        /* Toggle Switch */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--card-bg);
+            padding: 8px 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.4s;
+            border-radius: 26px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--success);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+        }
+
+        .card h3 {
+            color: var(--primary);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card h4 {
+            color: var(--text);
+            margin: 15px 0 10px 0;
+            font-size: 16px;
+        }
+
+        /* 🎯 CFD Opportunities Section */
+        .opportunities-section {
+            margin-bottom: 30px;
+        }
+
+        .opportunities-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+        }
+
+        .opportunity-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            border: 2px solid var(--border);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .opportunity-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .opportunity-card.high-signal {
+            border-color: var(--success);
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), var(--card-bg));
+        }
+
+        .opportunity-card.medium-signal {
+            border-color: var(--warning);
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), var(--card-bg));
+        }
+
+        .opportunity-card.low-signal {
+            border-color: var(--danger);
+            background: linear-gradient(135deg, rgba(220, 53, 69, 0.1), var(--card-bg));
+        }
+
+        .signal-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .signal-buy {
+            background: var(--success);
+        }
+
+        .signal-sell {
+            background: var(--danger);
+        }
+
+        .signal-wait {
+            background: var(--warning);
+        }
+
+        .opportunity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .opportunity-symbol {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--text);
+        }
+
+        .opportunity-price {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .opportunity-change {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .positive {
+            color: var(--success);
+        }
+
+        .negative {
+            color: var(--danger);
+        }
+
+        .confluence-meter {
+            background: var(--border);
+            border-radius: 10px;
+            height: 10px;
+            margin: 15px 0;
+            overflow: hidden;
+        }
+
+        .confluence-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+
+        .opportunity-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+            font-size: 13px;
+        }
+
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* 📐 Position Sizing Calculator */
+        .position-calculator {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.05), var(--card-bg));
+            border: 2px solid var(--primary);
+        }
+
+        .calc-inputs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .input-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .input-group input,
+        .input-group select,
+        .input-group textarea {
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            background: var(--card-bg);
+            color: var(--text);
+            width: 100%;
+        }
+
+        .input-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .calc-result {
+            background: var(--dark);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .result-row:last-child {
+            border-bottom: none;
+        }
+
+        /* 📚 CFD Library */
+        .library-section {
+            margin-bottom: 30px;
+        }
+
+        .library-filters {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+        }
+
+        .filter-btn.active {
+            background: var(--primary);
+        }
+
+        .library-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+        }
+
+        .library-item {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .library-item:hover {
+            border-color: var(--primary);
+            transform: scale(1.02);
+        }
+
+        .library-item.selected {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        /* 🍪 Cookie Banner */
+        .cookie-banner {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.95);
+            color: white;
+            padding: 20px;
+            z-index: 9998;
+            text-align: center;
+        }
+
+        .cookie-banner button {
+            margin: 10px;
+        }
+
+        .cookie-banner button.accept {
+            background: var(--success);
+        }
+
+        .cookie-banner button.decline {
+            background: var(--danger);
+        }
+
+        /* 🌙 Dark Mode Toggle */
+        .theme-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            font-size: 20px;
+            z-index: 9997;
+        }
+
+        /* 📊 Loading & Error States */
+        .loading-indicator {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            color: var(--primary);
+        }
+
+        .loading-indicator.active {
+            display: block;
+        }
+
+        .error-indicator {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            color: var(--danger);
+            background: rgba(220, 53, 69, 0.1);
+            border-radius: 12px;
+            margin: 20px 0;
+        }
+
+        .error-indicator.active {
+            display: block;
+        }
+
+        /* 📱 Responsive */
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .nav-buttons {
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            .risk-warning-sticky {
+                font-size: 12px;
+                padding: 10px;
+            }
+            
+            .opportunities-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .calc-inputs {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* 📊 Data Status Badge */
+        .data-status {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .badge-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* 🛡️ Risk Warning Box */
+        .confluence-warning {
+            background: #fff3cd;
+            padding: 15px;
+            border-left: 4px solid #ffc107;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+
+        /* 📋 Export Section */
+        .export-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        /* 🕐 Session Indicator */
+        .session-indicator {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .session-open {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .session-closed {
+            background: rgba(220, 53, 69, 0.2);
+            color: var(--danger);
+        }
+
+        /* 📊 Statistics Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, var(--primary), #1d4ed8);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+
+        /* 📝 Paper Trading Mode */
+        .paper-trading-banner {
+            display: none;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 15px;
+            text-align: center;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .paper-trading-banner.active {
+            display: block;
+        }
+
+        /* 📔 Trading Journal */
+        .journal-section {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), var(--card-bg));
+            border: 2px solid var(--success);
+        }
+
+        .journal-entries {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+
+        .journal-entry {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid var(--primary);
+        }
+
+        /* ✅ Pre-Trade Checklist */
+        .checklist-section {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.05), var(--card-bg));
+            border: 2px solid var(--warning);
+        }
+
+        .checklist-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            margin: 5px 0;
+            background: var(--card-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .checklist-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        /* 📅 Economic Calendar */
+        .economic-calendar {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.05), var(--card-bg));
+            border: 2px solid var(--warning);
+        }
+
+        .event-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin: 8px 0;
+            background: var(--card-bg);
+            border-radius: 8px;
+            border-left: 4px solid var(--border);
+        }
+
+        .event-item.high-impact {
+            border-left-color: var(--danger);
+            background: rgba(220, 53, 69, 0.05);
+        }
+
+        .event-item.medium-impact {
+            border-left-color: var(--warning);
+        }
+
+        .event-item.low-impact {
+            border-left-color: var(--success);
+        }
+
+        /* 🔀 Correlation Matrix */
+        .correlation-matrix {
+            overflow-x: auto;
+            margin-top: 15px;
+        }
+
+        .correlation-matrix table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .correlation-matrix th,
+        .correlation-matrix td {
+            padding: 10px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+
+        .correlation-matrix th {
+            background: var(--primary);
+            color: white;
+        }
+
+        .corr-positive {
+            background: rgba(220, 53, 69, 0.2);
+            color: var(--danger);
+        }
+
+        .corr-negative {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .corr-neutral {
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        /* 🎯 What-If Simulator */
+        .simulator-section {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.05), var(--card-bg));
+            border: 2px solid var(--primary);
+        }
+
+        .simulator-result {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-weight: 600;
+        }
+
+        .simulator-profit {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .simulator-loss {
+            background: rgba(220, 53, 69, 0.2);
+            color: var(--danger);
+        }
+
+        /* 📊 Performance Dashboard */
+        .performance-dashboard {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), var(--card-bg));
+            border: 2px solid var(--success);
+        }
+
+        /* 👁️ Watchlist */
+        .watchlist-section {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.05), var(--card-bg));
+            border: 2px solid var(--primary);
+        }
+
+        .watchlist-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin: 8px 0;
+            background: var(--card-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .watchlist-item input {
+            width: 100px;
+            padding: 5px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        /* 🎓 Mentor Mode */
+        .mentor-section {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.05), var(--card-bg));
+            border: 2px solid #8b5cf6;
+        }
+
+        .mentor-explanation {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .mentor-explanation ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .mentor-explanation li {
+            padding: 5px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .mentor-explanation li:last-child {
+            border-bottom: none;
+        }
+
+        /* 🗑️ Clear Data Button */
+        .clear-data-section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        /* 📊 Tabs Navigation */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--card-bg);
+            color: var(--text);
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* 📱 Mobile Optimizations */
+        @media (max-width: 480px) {
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .nav-buttons button {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+            
+            .opportunity-details {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* 🎯 Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 10000;
+            overflow-y: auto;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            max-width: 800px;
+            margin: 50px auto;
+            border-radius: 12px;
+            padding: 30px;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: var(--danger);
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        /* 🔔 Notification Toast */
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            background: var(--card-bg);
+            color: var(--text);
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            z-index: 9996;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.success {
+            border-left: 4px solid var(--success);
+        }
+
+        .toast.error {
+            border-left: 4px solid var(--danger);
+        }
+
+        .toast.warning {
+            border-left: 4px solid var(--warning);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* 📊 Progress Bar */
+        .progress-bar {
+            background: var(--border);
+            border-radius: 10px;
+            height: 8px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+
+        /* 🎯 Risk of Ruin Indicator */
+        .risk-of-ruin {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .risk-low {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .risk-medium {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning);
+        }
+
+        .risk-high {
+            background: rgba(220, 53, 69, 0.2);
+            color: var(--danger);
+        }
+    </style>
+</head>
+<body>
+    <!-- 🔴 RISK WARNING STICKY -->
+    <div class="risk-warning-sticky">
+        ⚠️ <strong>AVISO DE RISCO ESMA:</strong> 74-89% das contas retail perdem dinheiro com CFDs. 
+        Esta ferramenta é <u>EDUCATIVA</u>, não aconselhamento financeiro. 
+        <a href="#" onclick="openModal('riskModal'); return false;">Ler mais</a>
+    </div>
+
+    <!-- Header -->
+    <header>
+        <div class="header-content">
+            <div class="logo">
+                📊 CFD Analyzer Pro
+            </div>
+            <div class="nav-buttons">
+                <div class="toggle-container">
+                    <span>📝 Paper:</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="paperTradingToggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <button class="secondary" onclick="toggleDarkMode()">🌙</button>
+                <button onclick="exportData()">📥</button>
+                <button class="secondary" onclick="openModal('helpModal')">❓</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 📝 Paper Trading Banner -->
+    <div class="container">
+        <div class="paper-trading-banner" id="paperTradingBanner">
+            🎯 MODO PAPER TRADING ATIVO - Todas as operações são simuladas. Ideal para teste sem risco!
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 📊 TABS NAVIGATION -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('opportunities')">🔥 Oportunidades</button>
+            <button class="tab-btn" onclick="switchTab('calculator')">📐 Calculadora</button>
+            <button class="tab-btn" onclick="switchTab('journal')">📔 Journal</button>
+            <button class="tab-btn" onclick="switchTab('performance')">📊 Performance</button>
+            <button class="tab-btn" onclick="switchTab('library')">📚 Biblioteca</button>
+            <button class="tab-btn" onclick="switchTab('tools')">🛠️ Ferramentas</button>
+        </div>
+
+        <!-- 🔥 OPPORTUNITIES TAB -->
+        <div id="opportunities" class="tab-content active">
+            <!-- 🎯 CFD OPPORTUNITIES SECTION -->
+            <section class="opportunities-section">
+                <h2 style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                    🔥 Oportunidades CFD Agora
+                    <span class="session-indicator session-open" id="sessionStatus">Mercado Aberto</span>
+                </h2>
+                
+                <div class="data-status">
+                    <span class="badge badge-warning">⏱️ Dados: 15-20min delay</span>
+                    <span class="badge badge-info" id="lastUpdate">🕐 Última: --:--</span>
+                    <span class="badge badge-success" id="apiStatus">✅ API Conectada</span>
+                </div>
+
+                <div class="loading-indicator" id="loadingIndicator">
+                    ⏳ A carregar oportunidades de mercado...
+                </div>
+
+                <div class="error-indicator" id="errorIndicator">
+                    ❌ Erro ao carregar dados. Verifique a sua conexão e tente novamente.
+                    <button onclick="loadOpportunities()" style="margin-top: 10px;">🔄 Tentar Novamente</button>
+                </div>
+
+                <div class="opportunities-grid" id="opportunitiesGrid">
+                    <!-- Cards serão gerados via JavaScript -->
+                </div>
+            </section>
+
+            <!-- 📅 ECONOMIC CALENDAR -->
+            <section class="card economic-calendar">
+                <h3>📅 Calendário Económico Esta Semana</h3>
+                <p style="font-size: 13px; opacity: 0.7; margin-bottom: 15px;">
+                    ⚠️ Evite operar durante eventos de alto impacto. Volatilidade extrema!
+                </p>
+                <div id="economicEvents">
+                    <div class="event-item high-impact">
+                        <div>
+                            <strong>🔴 FOMC Rate Decision</strong>
+                            <div style="font-size: 12px; opacity: 0.7;">Federal Reserve - Taxas de Juro EUA</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div>Quarta, 19:00 UTC</div>
+                            <span class="badge badge-danger">Alto Impacto</span>
+                        </div>
+                    </div>
+                    <div class="event-item high-impact">
+                        <div>
+                            <strong>🔴 NFP (Non-Farm Payrolls)</strong>
+                            <div style="font-size: 12px; opacity: 0.7;">Emprego EUA</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div>Sexta, 13:30 UTC</div>
+                            <span class="badge badge-danger">Alto Impacto</span>
+                        </div>
+                    </div>
+                    <div class="event-item medium-impact">
+                        <div>
+                            <strong>🟡 ECB Rate Decision</strong>
+                            <div style="font-size: 12px; opacity: 0.7;">Banco Central Europeu</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div>Quinta, 13:45 UTC</div>
+                            <span class="badge badge-warning">Médio Impacto</span>
+                        </div>
+                    </div>
+                    <div class="event-item low-impact">
+                        <div>
+                            <strong>🟢 CPI Reino Unido</strong>
+                            <div style="font-size: 12px; opacity: 0.7;">Inflação UK</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div>Quarta, 07:00 UTC</div>
+                            <span class="badge badge-success">Baixo Impacto</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- 📐 CALCULATOR TAB -->
+        <div id="calculator" class="tab-content">
+            <!-- 📐 POSITION SIZING CALCULATOR -->
+            <section class="card position-calculator">
+                <h3>📐 Calculadora de Position Sizing</h3>
+                <p style="margin-bottom: 15px; font-size: 14px; color: var(--text); opacity: 0.8;">
+                    Calcule o tamanho ideal da sua posição baseado no seu risco por trade. 
+                    <strong>Regra de ouro: nunca arrisque mais de 1-2% do capital por trade.</strong>
+                </p>
+                
+                <div class="calc-inputs">
+                    <div class="input-group">
+                        <label>💰 Capital Total (€)</label>
+                        <input type="number" id="capital" value="10000" min="100" onchange="validateInputs()">
+                    </div>
+                    <div class="input-group">
+                        <label>⚠️ Risco por Trade (%)</label>
+                        <input type="number" id="riskPercent" value="1" min="0.1" max="5" step="0.1" onchange="validateInputs()">
+                    </div>
+                    <div class="input-group">
+                        <label>📈 Preço de Entrada</label>
+                        <input type="number" id="entryPrice" placeholder="Ex: 150.00" step="0.01">
+                    </div>
+                    <div class="input-group">
+                        <label>🛑 Stop-Loss</label>
+                        <input type="number" id="stopLoss" placeholder="Ex: 145.00" step="0.01">
+                    </div>
+                    <div class="input-group">
+                        <label>🎯 Take-Profit</label>
+                        <input type="number" id="takeProfit" placeholder="Ex: 160.00" step="0.01">
+                    </div>
+                    <div class="input-group">
+                        <label>⚡ Alavancagem</label>
+                        <select id="leverage">
+                            <option value="1">1:1 (Sem alavancagem)</option>
+                            <option value="5">1:5</option>
+                            <option value="10">1:10</option>
+                            <option value="20">1:20</option>
+                            <option value="30" selected>1:30 (Max ESMA)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <button onclick="calculatePosition()" style="width: 100%; margin-top: 10px;">
+                    🧮 Calcular Position Size
+                </button>
+                
+                <div class="calc-result" id="positionResult" style="display: none;">
+                    <!-- Resultados aqui -->
+                </div>
+
+                <div class="confluence-warning">
+                    ⚠️ <strong>IMPORTANTE:</strong> Confluência 70/100 NÃO significa 70% de probabilidade de lucro. 
+                    Significa apenas que 70% dos indicadores técnicos estão alinhados. 
+                    O mercado pode mover-se contra ti. Sempre usa Stop-Loss!
+                </div>
+            </section>
+
+            <!-- 💸 SWAP CALCULATOR -->
+            <section class="card">
+                <h3>🌙 Calculadora de Swap Overnight</h3>
+                <p style="font-size: 13px; opacity: 0.7; margin-bottom: 15px;">
+                    Custos de manter posições abertas além do fecho do mercado. Pode corroer lucros em trades multi-dia!
+                </p>
+                <div class="calc-inputs">
+                    <div class="input-group">
+                        <label>📊 Tamanho da Posição</label>
+                        <input type="number" id="swapPositionSize" placeholder="Ex: 10000">
+                    </div>
+                    <div class="input-group">
+                        <label>💱 Swap Rate Diário</label>
+                        <input type="number" id="swapRate" placeholder="Ex: -0.50" step="0.01">
+                    </div>
+                    <div class="input-group">
+                        <label>📅 Dias Mantidos</label>
+                        <input type="number" id="swapDays" placeholder="Ex: 5" value="1">
+                    </div>
+                </div>
+                <button onclick="calculateSwap()" style="width: 100%; margin-top: 10px;">
+                    💰 Calcular Custo Swap
+                </button>
+                <div class="calc-result" id="swapResult" style="display: none;"></div>
+            </section>
+
+            <!-- 🔀 WHAT-IF SIMULATOR -->
+            <section class="card simulator-section">
+                <h3>🔀 Simulador de Cenários "What-If"</h3>
+                <p style="font-size: 13px; opacity: 0.7; margin-bottom: 15px;">
+                    Testa cenários antes de entrar: "E se o mercado mover 2% contra mim?"
+                </p>
+                <div class="calc-inputs">
+                    <div class="input-group">
+                        <label>💰 Capital</label>
+                        <input type="number" id="simCapital" value="10000">
+                    </div>
+                    <div class="input-group">
+                        <label>📊 Tamanho Posição</label>
+                        <input type="number" id="simPositionSize" placeholder="Ex: 1000">
+                    </div>
+                    <div class="input-group">
+                        <label>📈 Preço Entrada</label>
+                        <input type="number" id="simEntryPrice" placeholder="Ex: 100">
+                    </div>
+                    <div class="input-group">
+                        <label>📉 Movimento (%)</label>
+                        <input type="number" id="simMovePercent" placeholder="Ex: -2" step="0.1">
+                    </div>
+                </div>
+                <button onclick="simulateScenario()" style="width: 100%; margin-top: 10px;">
+                    🎯 Simular Cenário
+                </button>
+                <div id="simulatorResult" class="simulator-result" style="display: none;"></div>
+            </section>
+
+            <!-- ✅ PRE-TRADE CHECKLIST -->
+            <section class="card checklist-section">
+                <h3>✅ Checklist Pré-Trade</h3>
+                <p style="font-size: 13px; opacity: 0.7; margin-bottom: 15px;">
+                    Completa TODOS os itens antes de entrar numa operação. Reduz trades impulsivos em 60%+!
+                </p>
+                <div id="preTradeChecklist">
+                    <div class="checklist-item">
+                        <input type="checkbox" id="check1" onchange="updateChecklistStatus()">
+                        <label for="check1">Confluência ≥70?</label>
+                    </div>
+                    <div class="checklist-item">
+                        <input type="checkbox" id="check2" onchange="updateChecklistStatus()">
+                        <label for="check2">R:R ≥1:2?</label>
+                    </div>
+                    <div class="checklist-item">
+                        <input type="checkbox" id="check3" onchange="updateChecklistStatus()">
+                        <label for="check3">Stop-Loss definido?</label>
+                    </div>
+                    <div class="checklist-item">
+                        <input type="checkbox" id="check4" onchange="updateChecklistStatus()">
+                        <label for="check4">Sem notícias de alto impacto hoje?</label>
+                    </div>
+                    <div class="checklist-item">
+                        <input type="checkbox" id="check5" onchange="updateChecklistStatus()">
+                        <label for="check5">Risco ≤2% do capital?</label>
+                    </div>
+                    <div class="checklist-item">
+                        <input type="checkbox" id="check6" onchange="updateChecklistStatus()">
+                        <label for="check6">Emoção controlada (sem FOMO/revenge)?</label>
+                    </div>
+                </div>
+                <button id="confirmTradeBtn" onclick="confirmTrade()" disabled style="width: 100%; margin-top: 15px; background: var(--warning);">
+                    ⚠️ Completa a Checklist para Confirmar
+                </button>
+            </section>
+        </div>
+
+        <!-- 📔 JOURNAL TAB -->
+        <div id="journal" class="tab-content">
+            <!-- 📔 TRADING JOURNAL -->
+            <section class="card journal-section">
+                <h3>📔 Diário de Trading</h3>
+                <p style="font-size: 13px; opacity: 0.7; margin-bottom: 15px;">
+                    80% dos traders não registam operações. O journal ajuda a identificar padrões emocionais e melhorar disciplina.
+                </p>
+                <div class="calc-inputs">
+                    <div class="input-group">
+                        <label>📊 Ativo</label>
+                        <input type="text" id="journalSymbol" placeholder="Ex: EURUSD">
+                    </div>
+                    <div class="input-group">
+                        <label>📈 Direção</label>
+                        <select id="journalDirection">
+                            <option value="BUY">Compra (Long)</option>
+                            <option value="SELL">Venda (Short)</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>💰 P&L (€)</label>
+                        <input type="number" id="journalPnL" placeholder="Ex: 150 ou -50">
+                    </div>
+                </div>
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <label>🧠 Porque entraste nesta operação? Que emoção sentiste?</label>
+                    <textarea id="journalNotes" placeholder="Ex: Entrei porque RSI estava sobrevendido. Senti ansiedade porque vinha de 2 perdas seguidas..."></textarea>
+                </div>
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <label>📚 Lições Aprendidas</label>
+                    <textarea id="journalLessons" placeholder="Ex: Devia ter esperado confirmação de volume. Não operar após perdas consecutivas."></textarea>
+                </div>
+                <button onclick="saveJournalEntry()" style="width: 100%;">
+                    💾 Guardar Entrada no Journal
+                </button>
+                
+                <h4 style="margin-top: 20px;">📜 Entradas Anteriores</h4>
+                <div class="journal-entries" id="journalEntries">
+                    <p style="opacity: 0.7; text-align: center;">Sem entradas ainda.</p>
+                </div>
+                <button class="secondary" onclick="clearJournal()" style="width: 100%; margin-top: 15px;">
+                    🗑️ Limpar Journal
+                </button>
+            </section>
+        </div>
+
+        <!-- 📊 PERFORMANCE TAB -->
+        <div id="performance" class="tab-content">
+            <!-- 📊 PERFORMANCE DASHBOARD -->
+            <section class="card performance-dashboard">
+                <h3>📊 Performance Analytics</h3>
+                <p style="font-size: 13px; opacity: 0.7; margin-bottom: 15px;">
+                    Métricas reais do teu trading. Feedback objetivo sobre a tua evolução.
+                </p>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="perfWinRate">0%</div>
+                        <div class="stat-label">Win Rate</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="perfProfitFactor">0.0</div>
+                        <div class="stat-label">Profit Factor</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="perfTotalTrades">0</div>
+                        <div class="stat-label">Total Trades</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="perfTotalPnL">€0</div>
+                        <div class="stat-label">P&L Total</div>
+                    </div>
+                </div>
+                
+                <h4 style="margin-top: 20px;">📈 Evolução do Capital</h4>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="capitalProgress" style="width: 100%; background: var(--success);"></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; margin-top: 5px;">
+                    <span>Capital Inicial</span>
+                    <span id="currentCapital">€10,000</span>
+                </div>
+
+                <h4 style="margin-top: 20px;">⚠️ Risk of Ruin</h4>
+                <div id="riskOfRuin" class="risk-of-ruin risk-low">
+                    Calculando...
+                </div>
+                <p style="font-size: 12px; opacity: 0.7; margin-top: 10px;">
+                    Probabilidade estatística de perder todo o capital baseado no teu win rate e R:R.
+                </p>
+            </section>
+
+            <!-- 🔀 CORRELATION MATRIX -->
+            <section class="card">
+                <h3>🔀 Matriz de Correlação</h3>
+                <p style="font-size: 13px; opacity: 0.7; margin-bottom: 15px;">
+                    Evita abrir múltiplas posições correlacionadas (ex: EURUSD + GBPUSD = risco duplicado).
+                </p>
+                <div class="correlation-matrix">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>EURUSD</th>
+                                <th>GBPUSD</th>
+                                <th>USDJPY</th>
+                                <th>USDCHF</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>EURUSD</strong></td>
+                                <td class="corr-neutral">1.00</td>
+                                <td class="corr-positive">0.82</td>
+                                <td class="corr-negative">-0.71</td>
+                                <td class="corr-negative">-0.85</td>
+                            </tr>
+                            <tr>
+                                <td><strong>GBPUSD</strong></td>
+                                <td class="corr-positive">0.82</td>
+                                <td class="corr-neutral">1.00</td>
+                                <td class="corr-negative">-0.65</td>
+                                <td class="corr-negative">-0.78</td>
+                            </tr>
+                            <tr>
+                                <td><strong>USDJPY</strong></td>
+                                <td class="corr-negative">-0.71</td>
+                                <td class="corr-negative">-0.65</td>
+                                <td class="corr-neutral">1.00</td>
+                                <td class="corr-positive">0.73</td>
+                            </tr>
+                            <tr>
+                                <td><strong>USDCHF</strong></td>
+                                <td class="corr-negative">-0.85</td>
+                                <td class="corr-negative">-0.78</td>
+                                <td class="corr-positive">0.73</td>
+                                <td class="corr-neutral">1.00</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p style="font-size: 12px; opacity: 0.7; margin-top: 10px;">
+                    ⚠️ Correlação >0.7 = Risco concentrado (evita abrir ambas as posições)
+                </p>
+            </section>
+        </div>
+
+        <!-- 📚 LIBRARY TAB -->
+        <div id="library" class="tab-content">
+            <!-- 📚 CFD LIBRARY -->
+            <section class="library-section">
+                <h3 style="margin-bottom: 20px;">📚 Biblioteca de CFDs (50+ Instrumentos)</h3>
+                
+                <div class="library-filters">
+                    <button class="filter-btn active" onclick="filterLibrary('all')">Todos</button>
+                    <button class="filter-btn" onclick="filterLibrary('forex')">Forex</button>
+                    <button class="filter-btn" onclick="filterLibrary('indices')">Índices</button>
+                    <button class="filter-btn" onclick="filterLibrary('commodities')">Commodities</button>
+                    <button class="filter-btn" onclick="filterLibrary('crypto')">Crypto</button>
+                    <button class="filter-btn" onclick="filterLibrary('stocks')">Ações</button>
+                </div>
+
+                <div class="library-grid" id="libraryGrid">
+                    <!-- Items gerados via JavaScript -->
+                </div>
+            </section>
+
+            <!-- 👁️ WATCHLIST -->
+            <section class="card watchlist-section">
+                <h3>👁️ Minha Watchlist</h3>
+                <p style="font-size: 13px; opacity: 0.7; margin-bottom: 15px;">
+                    Segue 5-10 ativos favoritos com notificações de preço.
+                </p>
+                <div id="watchlistContainer">
+                    <div class="watchlist-item">
+                        <div>
+                            <strong>EURUSD</strong>
+                            <div style="font-size: 11px; opacity: 0.7;">Preço atual: 1.0856</div>
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <input type="number" placeholder="Alerta >">
+                            <input type="number" placeholder="Alerta <">
+                            <button class="success" onclick="setAlert('EURUSD')">🔔</button>
+                            <button class="danger" onclick="removeFromWatchlist('EURUSD')">✕</button>
+                        </div>
+                    </div>
+                    <div class="watchlist-item">
+                        <div>
+                            <strong>XAUUSD</strong>
+                            <div style="font-size: 11px; opacity: 0.7;">Preço atual: 2034.50</div>
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <input type="number" placeholder="Alerta >">
+                            <input type="number" placeholder="Alerta <">
+                            <button class="success" onclick="setAlert('XAUUSD')">🔔</button>
+                            <button class="danger" onclick="removeFromWatchlist('XAUUSD')">✕</button>
+                        </div>
+                    </div>
+                </div>
+                <button onclick="addToWatchlist()" style="width: 100%; margin-top: 15px;">
+                    ➕ Adicionar à Watchlist
+                </button>
+            </section>
+        </div>
+
+        <!-- 🛠️ TOOLS TAB -->
+        <div id="tools" class="tab-content">
+            <!-- 🇵🇹 FISCALIDADE -->
+            <section class="card">
+                <h3>🇵🇹 Fiscalidade Portugal</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                    <div>
+                        <h4 style="color: var(--primary); margin-bottom: 10px;">Taxação</h4>
+                        <ul style="list-style: none; padding-left: 0;">
+                            <li>✅ <strong>28% taxa autónoma</strong> sobre lucro líquido</li>
+                            <li>✅ CFDs: sempre curto prazo (sem benefícios)</li>
+                            <li>✅ Ações >365 dias: possível desconto</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 style="color: var(--primary); margin-bottom: 10px;">Declaração IRS</h4>
+                        <ul style="list-style: none; padding-left: 0;">
+                            <li>✅ <strong>Anexo J</strong>: Broker estrangeiro (XTB)</li>
+                            <li>✅ <strong>Anexo G</strong>: Rendimentos nacionais</li>
+                            <li>✅ Cada operação deve ser reportada</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 style="color: var(--primary); margin-bottom: 10px;">Custos Dedutíveis</h4>
+                        <ul style="list-style: none; padding-left: 0;">
+                            <li>✅ Spreads</li>
+                            <li>✅ Comissões</li>
+                            <li>✅ Swaps overnight</li>
+                            <li>✅ Taxas cambiais (0.5%)</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="export-section">
+                    <button onclick="exportForIRS()" style="width: 100%;">
+                        📄 Exportar para IRS (Anexo J/G)
+                    </button>
+                    <p style="margin-top: 10px; font-size: 13px; color: var(--text); opacity: 0.7;">
+                        ⚠️ Guarde este ficheiro para o seu contabilista. Declaração obrigatória no Anexo J para brokers estrangeiros.
+                    </p>
+                </div>
+            </section>
+
+            <!-- 🎓 MENTOR MODE -->
+            <section class="card mentor-section">
+                <h3>🎓 Modo Mentor</h3>
+                <p style="font-size: 13px; opacity: 0.7; margin-bottom: 15px;">
+                    Entende PORQUÊ cada sinal foi gerado. Transforma-te de utilizador passivo em trader educado.
+                </p>
+                <div class="mentor-explanation">
+                    <h4>Exemplo: Sinal BUY em EURUSD</h4>
+                    <ul>
+                        <li>✅ <strong>RSI=32</strong> (sobrevendido - possível reversão)</li>
+                        <li>✅ <strong>SMA20 > SMA50</strong> (tendência de alta confirmada)</li>
+                        <li>✅ <strong>Volume +30%</strong> acima da média (interesse do mercado)</li>
+                        <li>✅ <strong>ADX=28</strong> (tendência forte - bom para operar)</li>
+                        <li>❌ <strong>BB Squeeze</strong> (volatilidade baixa - aguardar breakout)</li>
+                        <li>⚠️ <strong>FOMC amanhã</strong> (evento de alto risco - considerar esperar)</li>
+                    </ul>
+                    <p style="margin-top: 10px; font-size: 13px;">
+                        <strong>Conclusão:</strong> 4/6 indicadores positivos. Confluência 67/100. 
+                        Considerar entrar APÓS evento FOMC para reduzir risco.
+                    </p>
+                </div>
+            </section>
+
+            <!-- 📥 EXPORT OPTIONS -->
+            <section class="card">
+                <h3>📥 Exportar Dados</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <button onclick="exportData()" style="width: 100%;">
+                        📊 JSON (Backup Completo)
+                    </button>
+                    <button onclick="exportForIRS()" style="width: 100%;">
+                        📄 CSV (IRS Anexo J/G)
+                    </button>
+                    <button onclick="exportToExcel()" style="width: 100%;">
+                        📈 Excel (Análise)
+                    </button>
+                </div>
+            </section>
+
+            <!-- 🗑️ CLEAR DATA -->
+            <section class="card clear-data-section">
+                <h3>🗑️ Gestão de Dados</h3>
+                <p style="font-size: 13px; opacity: 0.7; margin-bottom: 15px;">
+                    Limpa todos os dados guardados localmente. Não reversível!
+                </p>
+                <button class="danger" onclick="clearAllData()" style="width: 100%;">
+                    🗑️ Limpar Todos os Dados
+                </button>
+            </section>
+        </div>
+
+        <!-- 🕐 MARKET SESSIONS -->
+        <section class="card" style="margin-top: 30px;">
+            <h3>🕐 Sessões de Mercado</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <div>
+                    <strong>Londres:</strong> 08:00-16:30 UTC
+                    <span class="session-indicator session-open" id="londonSession">Aberto</span>
+                </div>
+                <div>
+                    <strong>Nova Iorque:</strong> 13:30-20:00 UTC
+                    <span class="session-indicator session-closed" id="nySession">Fechado</span>
+                </div>
+                <div>
+                    <strong>Overlap EU/US:</strong> 13:30-16:30 UTC
+                    <span class="badge badge-success">Melhor Horário!</span>
+                </div>
+                <div>
+                    <strong>Ásia:</strong> 00:00-08:00 UTC
+                    <span class="session-indicator session-closed" id="asiaSession">Fechado</span>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- 🍪 COOKIE BANNER -->
+    <div class="cookie-banner" id="cookieBanner">
+        <p>🍪 Este site usa localStorage para guardar as suas preferências. Não partilhamos dados com terceiros.</p>
+        <button class="accept" onclick="acceptCookies()">Aceitar</button>
+        <button class="decline" onclick="declineCookies()">Recusar</button>
+    </div>
+
+    <!-- 🌙 DARK MODE TOGGLE -->
+    <button class="theme-toggle" onclick="toggleDarkMode()" title="Alternar Tema">🌙</button>
+
+    <!-- 🔔 NOTIFICATION TOAST -->
+    <div class="toast" id="toast"></div>
+
+    <!-- ⚠️ RISK INFO MODAL -->
+    <div id="riskModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-close" onclick="closeModal('riskModal')">✕</div>
+            <h2 style="color: var(--danger); margin-bottom: 20px;">⚠️ Informação de Risco Completa</h2>
+            
+            <div style="background: rgba(220, 53, 69, 0.1); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h3 style="color: var(--danger);">CFDs São Instrumentos Complexos</h3>
+                <p>74-89% das contas de investidores não profissionais perdem dinheiro ao negociar CFDs.</p>
+            </div>
+
+            <h4>Riscos Principais:</h4>
+            <ul style="margin: 15px 0; padding-left: 20px;">
+                <li>🔴 <strong>Alavancagem:</strong> Amplifica ganhos E perdas</li>
+                <li>🔴 <strong>Volatilidade:</strong> Preços podem mudar rapidamente</li>
+                <li>🔴 <strong>Liquidez:</strong> Dificuldade em fechar posições</li>
+                <li>🔴 <strong>Swap Overnight:</strong> Custos diários em posições mantidas</li>
+                <li>🔴 <strong>Risco de Mercado:</strong> Eventos económicos imprevisíveis</li>
+            </ul>
+
+            <h4>Proteções ESMA:</h4>
+            <ul style="margin: 15px 0; padding-left: 20px;">
+                <li>✅ Limite de alavancagem: 1:30 (Forex major), 1:20 (outros)</li>
+                <li>✅ Proteção contra balanço negativo</li>
+                <li>✅ Margin close-out rule (50% da margem)</li>
+                <li>✅ Proibição de incentivos comerciais</li>
+            </ul>
+
+            <h4>Recomendações:</h4>
+            <ul style="margin: 15px 0; padding-left: 20px;">
+                <li>💡 Comece em <strong>Paper Trading</strong></li>
+                <li>💡 Nunca arrisque mais de <strong>1-2% por trade</strong></li>
+                <li>💡 Use sempre <strong>Stop-Loss</strong></li>
+                <li>💡 Mantenha <strong>R:R mínimo de 1:2</strong></li>
+                <li>💡 Não opere durante <strong>notícias importantes</strong></li>
+            </ul>
+
+            <p style="margin-top: 20px; font-size: 13px; color: var(--text); opacity: 0.7;">
+                Esta ferramenta é educativa e não constitui aconselhamento de investimento. 
+                Consulte um advisor financeiro certificado antes de operar.
+            </p>
+        </div>
+    </div>
+
+    <!-- ❓ HELP MODAL -->
+    <div id="helpModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-close" onclick="closeModal('helpModal')">✕</div>
+            <h2 style="color: var(--primary); margin-bottom: 20px;">❓ Guia de Utilização</h2>
+            
+            <h4>🚀 Começar:</h4>
+            <ol style="margin: 15px 0; padding-left: 20px;">
+                <li>Ativa <strong>Paper Trading</strong> para testar sem risco</li>
+                <li>Define o teu <strong>capital e risco por trade</strong> (máx 2%)</li>
+                <li>Usa a <strong>Calculadora de Position Sizing</strong> antes de cada trade</li>
+                <li>Completa a <strong>Checklist Pré-Trade</strong></li>
+                <li>Regista no <strong>Journal</strong> após cada operação</li>
+            </ol>
+
+            <h4>📊 Interpretação de Sinais:</h4>
+            <ul style="margin: 15px 0; padding-left: 20px;">
+                <li><strong>Confluência ≥70:</strong> Alta (múltiplos indicadores alinhados)</li>
+                <li><strong>Confluência 50-69:</strong> Média (alguns indicadores concordam)</li>
+                <li><strong>Confluência <50:</strong> Baixa (evitar operar)</li>
+            </ul>
+
+            <h4>⚠️ Lembretes Importantes:</h4>
+            <ul style="margin: 15px 0; padding-left: 20px;">
+                <li>Confluência NÃO é probabilidade de lucro</li>
+                <li>Sempre usa Stop-Loss</li>
+                <li>Não operes durante eventos de alto impacto</li>
+                <li>Guarda extratos para declaração fiscal</li>
+            </ul>
+
+            <p style="margin-top: 20px; font-size: 13px; opacity: 0.7;">
+                Dúvidas? Consulta o Modo Mentor na secção Ferramentas.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // 📚 CFD LIBRARY - 50+ INSTRUMENTS
+        // ============================================
+        const cfdLibrary = {
+            forex: [
+                { symbol: 'EURUSD', name: 'Euro/USD', spread: 0.00012, leverage: 30, volatility: 'Média' },
+                { symbol: 'GBPUSD', name: 'Libra/USD', spread: 0.00015, leverage: 30, volatility: 'Alta' },
+                { symbol: 'USDJPY', name: 'USD/Japão', spread: 0.00010, leverage: 30, volatility: 'Média' },
+                { symbol: 'USDCHF', name: 'USD/Franco', spread: 0.00013, leverage: 30, volatility: 'Baixa' },
+                { symbol: 'AUDUSD', name: 'AUD/USD', spread: 0.00014, leverage: 30, volatility: 'Média' },
+                { symbol: 'USDCAD', name: 'USD/CAD', spread: 0.00016, leverage: 30, volatility: 'Média' },
+                { symbol: 'NZDUSD', name: 'NZD/USD', spread: 0.00017, leverage: 30, volatility: 'Alta' },
+                { symbol: 'EURGBP', name: 'Euro/Libra', spread: 0.00018, leverage: 30, volatility: 'Baixa' }
+            ],
+            indices: [
+                { symbol: 'US30', name: 'Dow Jones', spread: 2.5, leverage: 20, volatility: 'Alta' },
+                { symbol: 'US500', name: 'S&P 500', spread: 0.5, leverage: 20, volatility: 'Média' },
+                { symbol: 'NAS100', name: 'Nasdaq 100', spread: 1.5, leverage: 20, volatility: 'Alta' },
+                { symbol: 'DE40', name: 'DAX 40', spread: 1.0, leverage: 20, volatility: 'Média' },
+                { symbol: 'UK100', name: 'FTSE 100', spread: 1.2, leverage: 20, volatility: 'Média' },
+                { symbol: 'FR40', name: 'CAC 40', spread: 1.3, leverage: 20, volatility: 'Média' },
+                { symbol: 'ES35', name: 'IBEX 35', spread: 1.5, leverage: 20, volatility: 'Média' },
+                { symbol: 'JP225', name: 'Nikkei 225', spread: 3.0, leverage: 20, volatility: 'Alta' }
+            ],
+            commodities: [
+                { symbol: 'XAUUSD', name: 'Ouro', spread: 0.35, leverage: 20, volatility: 'Alta' },
+                { symbol: 'XAGUSD', name: 'Prata', spread: 0.03, leverage: 20, volatility: 'Muito Alta' },
+                { symbol: 'XTIUSD', name: 'WTI Crude', spread: 0.03, leverage: 10, volatility: 'Muito Alta' },
+                { symbol: 'XBRUSD', name: 'Brent Crude', spread: 0.03, leverage: 10, volatility: 'Muito Alta' },
+                { symbol: 'XNGUSD', name: 'Gás Natural', spread: 0.001, leverage: 10, volatility: 'Extrema' },
+                { symbol: 'COPPER', name: 'Cobre', spread: 0.002, leverage: 20, volatility: 'Média' },
+                { symbol: 'WHEAT', name: 'Trigo', spread: 0.01, leverage: 10, volatility: 'Alta' },
+                { symbol: 'CORN', name: 'Milho', spread: 0.01, leverage: 10, volatility: 'Média' }
+            ],
+            crypto: [
+                { symbol: 'BTCUSD', name: 'Bitcoin', spread: 35, leverage: 5, volatility: 'Extrema' },
+                { symbol: 'ETHUSD', name: 'Ethereum', spread: 2.5, leverage: 5, volatility: 'Extrema' },
+                { symbol: 'XRPUSD', name: 'Ripple', spread: 0.002, leverage: 5, volatility: 'Muito Alta' },
+                { symbol: 'LTCUSD', name: 'Litecoin', spread: 0.05, leverage: 5, volatility: 'Muito Alta' },
+                { symbol: 'ADAUSD', name: 'Cardano', spread: 0.0003, leverage: 5, volatility: 'Muito Alta' },
+                { symbol: 'SOLUSD', name: 'Solana', spread: 0.02, leverage: 5, volatility: 'Extrema' },
+                { symbol: 'DOTUSD', name: 'Polkadot', spread: 0.005, leverage: 5, volatility: 'Muito Alta' },
+                { symbol: 'BNBUSD', name: 'Binance Coin', spread: 0.03, leverage: 5, volatility: 'Muito Alta' }
+            ],
+            stocks: [
+                { symbol: 'AAPL', name: 'Apple', spread: 0.08, leverage: 5, volatility: 'Média' },
+                { symbol: 'MSFT', name: 'Microsoft', spread: 0.10, leverage: 5, volatility: 'Média' },
+                { symbol: 'GOOGL', name: 'Alphabet', spread: 0.15, leverage: 5, volatility: 'Média' },
+                { symbol: 'AMZN', name: 'Amazon', spread: 0.12, leverage: 5, volatility: 'Média' },
+                { symbol: 'TSLA', name: 'Tesla', spread: 0.20, leverage: 5, volatility: 'Muito Alta' },
+                { symbol: 'META', name: 'Meta', spread: 0.15, leverage: 5, volatility: 'Alta' },
+                { symbol: 'NVDA', name: 'NVIDIA', spread: 0.18, leverage: 5, volatility: 'Muito Alta' },
+                { symbol: 'JPM', name: 'JPMorgan', spread: 0.10, leverage: 5, volatility: 'Média' },
+                { symbol: 'V', name: 'Visa', spread: 0.12, leverage: 5, volatility: 'Baixa' },
+                { symbol: 'JNJ', name: 'Johnson & Johnson', spread: 0.10, leverage: 5, volatility: 'Baixa' }
+            ]
+        };
+
+        // ============================================
+        // 🎯 OPPORTUNITIES DATA (Simulated for Demo)
+        // ============================================
+        const opportunitiesData = [
+            { symbol: 'EURUSD', price: 1.0856, change: 0.35, signal: 'BUY', confluence: 78, category: 'forex' },
+            { symbol: 'GBPUSD', price: 1.2634, change: -0.22, signal: 'SELL', confluence: 72, category: 'forex' },
+            { symbol: 'XAUUSD', price: 2034.50, change: 1.25, signal: 'BUY', confluence: 85, category: 'commodities' },
+            { symbol: 'US500', price: 4783.25, change: 0.45, signal: 'BUY', confluence: 68, category: 'indices' },
+            { symbol: 'BTCUSD', price: 43250.00, change: -2.15, signal: 'SELL', confluence: 65, category: 'crypto' },
+            { symbol: 'TSLA', price: 248.50, change: 3.20, signal: 'BUY', confluence: 74, category: 'stocks' },
+            { symbol: 'XTIUSD', price: 72.45, change: -1.05, signal: 'SELL', confluence: 71, category: 'commodities' },
+            { symbol: 'NAS100', price: 16825.00, change: 0.85, signal: 'BUY', confluence: 82, category: 'indices' }
+        ];
+
+        // ============================================
+        // 🔧 CORE FUNCTIONS
+        // ============================================
+
+        // Initialize App
+        document.addEventListener('DOMContentLoaded', function() {
+            loadOpportunities();
+            renderLibrary('all');
+            loadJournalEntries();
+            updatePerformance();
+            updateSessionStatus();
+            checkCookies();
+            loadPaperTradingState();
+            updateRiskStats();
+            updateChecklistStatus();
+            
+            // Auto-refresh every 5 minutes
+            setInterval(() => {
+                loadOpportunities();
+                updateSessionStatus();
+                updatePerformance();
+                document.getElementById('lastUpdate').textContent = '🕐 Última: ' + new Date().toLocaleTimeString('pt-PT');
+            }, 300000);
+        });
+
+        // Tab Switching
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Load Opportunities
+        function loadOpportunities() {
+            document.getElementById('loadingIndicator').classList.add('active');
+            document.getElementById('errorIndicator').classList.remove('active');
+            
+            setTimeout(() => {
+                try {
+                    const grid = document.getElementById('opportunitiesGrid');
+                    grid.innerHTML = '';
+                    
+                    opportunitiesData.forEach(opp => {
+                        const card = createOpportunityCard(opp);
+                        grid.appendChild(card);
+                    });
+                    
+                    document.getElementById('loadingIndicator').classList.remove('active');
+                    document.getElementById('lastUpdate').textContent = '🕐 Última: ' + new Date().toLocaleTimeString('pt-PT');
+                } catch (error) {
+                    document.getElementById('loadingIndicator').classList.remove('active');
+                    document.getElementById('errorIndicator').classList.add('active');
+                }
+            }, 1500);
+        }
+
+        // Create Opportunity Card
+        function createOpportunityCard(opp) {
+            const card = document.createElement('div');
+            const signalClass = opp.signal === 'BUY' ? 'signal-buy' : opp.signal === 'SELL' ? 'signal-sell' : 'signal-wait';
+            const confluenceClass = opp.confluence >= 70 ? 'high-signal' : opp.confluence >= 50 ? 'medium-signal' : 'low-signal';
+            const changeClass = opp.change >= 0 ? 'positive' : 'negative';
+            const changeSign = opp.change >= 0 ? '+' : '';
+            
+            card.className = `opportunity-card ${confluenceClass}`;
+            card.innerHTML = `
+                <span class="signal-badge ${signalClass}">${opp.signal}</span>
+                <div class="opportunity-header">
+                    <div>
+                        <div class="opportunity-symbol">${opp.symbol}</div>
+                        <div style="font-size: 12px; opacity: 0.7;">${getCategoryName(opp.category)}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="opportunity-price">${formatPrice(opp.price, opp.symbol)}</div>
+                        <div class="opportunity-change ${changeClass}">${changeSign}${opp.change.toFixed(2)}%</div>
+                    </div>
+                </div>
+                <div>
+                    <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px;">
+                        <span>Confluência</span>
+                        <span>${opp.confluence}/100</span>
+                    </div>
+                    <div class="confluence-meter">
+                        <div class="confluence-fill" style="width: ${opp.confluence}%; background: ${getConfluenceColor(opp.confluence)};"></div>
+                    </div>
+                </div>
+                <div class="opportunity-details">
+                    <div class="detail-item">
+                        <span>📊 Volatilidade</span>
+                        <span>${getVolatility(opp.symbol)}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span>🔧 Spread</span>
+                        <span>${getSpread(opp.symbol)}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span>⚡ Alavancagem</span>
+                        <span>1:${getLeverage(opp.category)}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span>🕐 Sessão</span>
+                        <span>${getBestSession(opp.category)}</span>
+                    </div>
+                </div>
+                <button onclick="selectOpportunity('${opp.symbol}')" 
+                        style="width: 100%; margin-top: 15px; background: ${opp.signal === 'BUY' ? 'var(--success)' : 'var(--danger)'};">
+                    📈 Analisar ${opp.symbol}
+                </button>
+            `;
+            
+            return card;
+        }
+
+        // Render CFD Library
+        function renderLibrary(category) {
+            const grid = document.getElementById('libraryGrid');
+            grid.innerHTML = '';
+            
+            const items = category === 'all' 
+                ? Object.values(cfdLibrary).flat()
+                : cfdLibrary[category] || [];
+            
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'library-item';
+                div.innerHTML = `
+                    <div style="font-weight: 700;">${item.symbol}</div>
+                    <div style="font-size: 12px; opacity: 0.7;">${item.name}</div>
+                    <div style="font-size: 11px; margin-top: 5px;">
+                        Spread: ${item.spread} | Lev: 1:${item.leverage}
+                    </div>
+                `;
+                div.onclick = () => selectFromLibrary(item);
+                grid.appendChild(div);
+            });
+            
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event?.target?.classList.add('active');
+        }
+
+        function filterLibrary(category) {
+            renderLibrary(category);
+        }
+
+        // Position Sizing Calculator
+        function calculatePosition() {
+            if (!validateInputs()) return;
+            
+            const capital = parseFloat(document.getElementById('capital').value);
+            const riskPercent = parseFloat(document.getElementById('riskPercent').value);
+            const entryPrice = parseFloat(document.getElementById('entryPrice').value);
+            const stopLoss = parseFloat(document.getElementById('stopLoss').value);
+            const takeProfit = parseFloat(document.getElementById('takeProfit').value);
+            const leverage = parseInt(document.getElementById('leverage').value);
+            
+            if (!entryPrice || !stopLoss) {
+                showToast('⚠️ Preencha Preço de Entrada e Stop-Loss', 'warning');
+                return;
+            }
+            
+            const riskAmount = capital * (riskPercent / 100);
+            const priceDifference = Math.abs(entryPrice - stopLoss);
+            const positionSize = riskAmount / priceDifference;
+            const positionValue = positionSize * entryPrice;
+            const marginRequired = positionValue / leverage;
+            
+            let rRatio = 'N/A';
+            if (takeProfit) {
+                const reward = Math.abs(takeProfit - entryPrice);
+                const risk = priceDifference;
+                rRatio = `1:${(reward / risk).toFixed(2)}`;
+            }
+            
+            const resultDiv = document.getElementById('positionResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `
+                <div class="result-row">
+                    <span>💰 Valor em Risco:</span>
+                    <span style="color: var(--danger);">€${riskAmount.toFixed(2)}</span>
+                </div>
+                <div class="result-row">
+                    <span>📊 Tamanho da Posição:</span>
+                    <span>${positionSize.toFixed(2)} unidades</span>
+                </div>
+                <div class="result-row">
+                    <span>💵 Valor da Posição:</span>
+                    <span>€${positionValue.toFixed(2)}</span>
+                </div>
+                <div class="result-row">
+                    <span>🔒 Margem Requerida:</span>
+                    <span>€${marginRequired.toFixed(2)}</span>
+                </div>
+                <div class="result-row">
+                    <span>⚡ Alavancagem:</span>
+                    <span>1:${leverage}</span>
+                </div>
+                <div class="result-row">
+                    <span>🎯 Risk/Reward:</span>
+                    <span style="color: ${rRatio.includes('1:2') || rRatio.includes('1:3') ? 'var(--success)' : 'var(--warning)'};">${rRatio}</span>
+                </div>
+                <div class="result-row" style="margin-top: 10px; padding-top: 10px; border-top: 2px solid rgba(255,255,255,0.3);">
+                    <span>✅ R:R Mínimo 1:2?</span>
+                    <span style="color: ${rRatio.includes('1:2') || rRatio.includes('1:3') ? 'var(--success)' : 'var(--danger)'};">
+                        ${rRatio.includes('1:2') || rRatio.includes('1:3') ? 'SIM ✓' : 'NÃO ✗'}
+                    </span>
+                </div>
+            `;
+            
+            showToast('✅ Position size calculado!', 'success');
+        }
+
+        // Swap Calculator
+        function calculateSwap() {
+            const positionSize = parseFloat(document.getElementById('swapPositionSize').value);
+            const swapRate = parseFloat(document.getElementById('swapRate').value);
+            const days = parseInt(document.getElementById('swapDays').value);
+            
+            if (!positionSize || !swapRate || !days) {
+                showToast('⚠️ Preencha todos os campos', 'warning');
+                return;
+            }
+            
+            const dailySwap = positionSize * swapRate;
+            const totalSwap = dailySwap * days;
+            const currencyFee = totalSwap * 0.005;
+            const total = totalSwap + currencyFee;
+            
+            const resultDiv = document.getElementById('swapResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `
+                <div class="result-row">
+                    <span>Swap Diário:</span>
+                    <span>€${dailySwap.toFixed(2)}</span>
+                </div>
+                <div class="result-row">
+                    <span>Swap Total (${days} dias):</span>
+                    <span>€${totalSwap.toFixed(2)}</span>
+                </div>
+                <div class="result-row">
+                    <span>Taxa Cambial (0.5%):</span>
+                    <span>€${currencyFee.toFixed(2)}</span>
+                </div>
+                <div class="result-row" style="margin-top: 10px; padding-top: 10px; border-top: 2px solid rgba(255,255,255,0.3); font-size: 16px;">
+                    <span>Custo TOTAL:</span>
+                    <span style="color: ${total < 0 ? 'var(--success)' : 'var(--danger)'};">€${total.toFixed(2)}</span>
+                </div>
+            `;
+            
+            showToast('✅ Custo swap calculado!', 'success');
+        }
+
+        // What-If Simulator
+        function simulateScenario() {
+            const capital = parseFloat(document.getElementById('simCapital').value);
+            const positionSize = parseFloat(document.getElementById('simPositionSize').value);
+            const entryPrice = parseFloat(document.getElementById('simEntryPrice').value);
+            const movePercent = parseFloat(document.getElementById('simMovePercent').value);
+            
+            if (!positionSize || !entryPrice || !movePercent) {
+                showToast('⚠️ Preencha todos os campos', 'warning');
+                return;
+            }
+            
+            const moveAmount = entryPrice * (movePercent / 100);
+            const pnl = positionSize * moveAmount;
+            const newEquity = capital + pnl;
+            const marginCall = pnl < -(capital * 0.5);
+            
+            const resultDiv = document.getElementById('simulatorResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = `simulator-result ${pnl >= 0 ? 'simulator-profit' : 'simulator-loss'}`;
+            resultDiv.innerHTML = `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                    <span>Movimento:</span>
+                    <span>${movePercent >= 0 ? '+' : ''}${movePercent}%</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                    <span>P&L:</span>
+                    <span>€${pnl.toFixed(2)}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                    <span>Novo Capital:</span>
+                    <span>€${newEquity.toFixed(2)}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 14px;">
+                    <span>⚠️ Margin Call:</span>
+                    <span>${marginCall ? 'SIM - RISCO EXTREMO!' : 'NÃO'}</span>
+                </div>
+            `;
+            
+            showToast(marginCall ? '⚠️ Risco de Margin Call!' : '✅ Cenário simulado', marginCall ? 'error' : 'success');
+        }
+
+        // Validate Inputs
+        function validateInputs() {
+            const capital = document.getElementById('capital');
+            const riskPercent = document.getElementById('riskPercent');
+            
+            if (capital.value <= 0 || isNaN(capital.value)) {
+                showToast('⚠️ Capital deve ser maior que 0', 'error');
+                capital.value = 10000;
+                return false;
+            }
+            
+            if (riskPercent.value <= 0 || riskPercent.value > 5) {
+                showToast('⚠️ Risco deve ser entre 0.1% e 5%', 'warning');
+                riskPercent.value = Math.min(Math.max(riskPercent.value, 0.1), 5);
+                return false;
+            }
+            
+            if (riskPercent.value > 2) {
+                showToast('⚠️ Risco >2% é excessivo. Recomendado: 1-2%', 'warning');
+            }
+            
+            updateRiskStats();
+            return true;
+        }
+
+        // Update Risk Stats
+        function updateRiskStats() {
+            const capital = parseFloat(document.getElementById('capital').value) || 10000;
+            const riskPercent = parseFloat(document.getElementById('riskPercent').value) || 1;
+            const maxDailyLoss = parseFloat(document.getElementById('maxDailyLoss')?.value) || 3;
+            
+            const riskEl = document.getElementById('riskAmount');
+            const maxLossEl = document.getElementById('maxDailyLossAmount');
+            
+            if (riskEl) riskEl.textContent = '€' + (capital * riskPercent / 100).toFixed(0);
+            if (maxLossEl) maxLossEl.textContent = '€' + (capital * maxDailyLoss / 100).toFixed(0);
+        }
+
+        // Pre-Trade Checklist
+        function updateChecklistStatus() {
+            const checkboxes = document.querySelectorAll('#preTradeChecklist input[type="checkbox"]');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            const btn = document.getElementById('confirmTradeBtn');
+            
+            if (allChecked) {
+                btn.disabled = false;
+                btn.innerHTML = '✅ Trade Confirmado - Boa Sorte!';
+                btn.style.background = 'var(--success)';
+            } else {
+                btn.disabled = true;
+                btn.innerHTML = `⚠️ Completa a Checklist (${Array.from(checkboxes).filter(cb => cb.checked).length}/6)`;
+                btn.style.background = 'var(--warning)';
+            }
+        }
+
+        function confirmTrade() {
+            showToast('✅ Trade confirmado! Regista no Journal após fechar.', 'success');
+            document.querySelectorAll('#preTradeChecklist input[type="checkbox"]').forEach(cb => {
+                cb.checked = false;
+            });
+            updateChecklistStatus();
+        }
+
+        // Trading Journal
+        function saveJournalEntry() {
+            const symbol = document.getElementById('journalSymbol').value;
+            const direction = document.getElementById('journalDirection').value;
+            const pnl = parseFloat(document.getElementById('journalPnL').value);
+            const notes = document.getElementById('journalNotes').value;
+            const lessons = document.getElementById('journalLessons').value;
+            
+            if (!symbol || isNaN(pnl)) {
+                showToast('⚠️ Preencha pelo menos Ativo e P&L', 'warning');
+                return;
+            }
+            
+            let journal = JSON.parse(localStorage.getItem('tradingJournal') || '[]');
+            journal.unshift({
+                date: new Date().toISOString(),
+                symbol,
+                direction,
+                pnl,
+                notes,
+                lessons
+            });
+            journal = journal.slice(0, 100);
+            localStorage.setItem('tradingJournal', JSON.stringify(journal));
+            
+            let history = JSON.parse(localStorage.getItem('signalHistory') || '[]');
+            history.unshift({
+                date: new Date().toISOString(),
+                symbol,
+                direction,
+                pnl,
+                result: pnl >= 0 ? 'win' : 'loss'
+            });
+            localStorage.setItem('signalHistory', JSON.stringify(history.slice(0, 100)));
+            
+            showToast('✅ Entrada guardada no Journal!', 'success');
+            
+            document.getElementById('journalSymbol').value = '';
+            document.getElementById('journalPnL').value = '';
+            document.getElementById('journalNotes').value = '';
+            document.getElementById('journalLessons').value = '';
+            
+            loadJournalEntries();
+            updatePerformance();
+        }
+
+        function loadJournalEntries() {
+            const journal = JSON.parse(localStorage.getItem('tradingJournal') || '[]');
+            const container = document.getElementById('journalEntries');
+            
+            if (journal.length === 0) {
+                container.innerHTML = '<p style="opacity: 0.7; text-align: center;">Sem entradas ainda.</p>';
+                return;
+            }
+            
+            container.innerHTML = journal.slice(0, 20).map(entry => `
+                <div class="journal-entry">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <strong>${entry.symbol} - ${entry.direction}</strong>
+                        <span style="color: ${entry.pnl >= 0 ? 'var(--success)' : 'var(--danger)'};">
+                            €${entry.pnl.toFixed(2)}
+                        </span>
+                    </div>
+                    <div style="font-size: 12px; opacity: 0.7; margin-bottom: 5px;">
+                        ${new Date(entry.date).toLocaleString('pt-PT')}
+                    </div>
+                    ${entry.notes ? `<div style="font-size: 13px; margin-bottom: 5px;">📝 ${entry.notes}</div>` : ''}
+                    ${entry.lessons ? `<div style="font-size: 13px;">💡 ${entry.lessons}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function clearJournal() {
+            if (confirm('Tem a certeza que deseja limpar todo o Journal?')) {
+                localStorage.removeItem('tradingJournal');
+                loadJournalEntries();
+                showToast('🗑️ Journal limpo', 'success');
+            }
+        }
+
+        // Performance Analytics
+        function updatePerformance() {
+            const history = JSON.parse(localStorage.getItem('signalHistory') || '[]');
+            const trades = history.filter(t => t.pnl !== undefined);
+            
+            if (trades.length === 0) {
+                document.getElementById('perfWinRate').textContent = '0%';
+                document.getElementById('perfProfitFactor').textContent = '0.0';
+                document.getElementById('perfTotalTrades').textContent = '0';
+                document.getElementById('perfTotalPnL').textContent = '€0';
+                document.getElementById('riskOfRuin').textContent = 'Sem dados suficientes';
+                document.getElementById('riskOfRuin').className = 'risk-of-ruin risk-low';
+                return;
+            }
+            
+            const wins = trades.filter(t => t.pnl > 0);
+            const losses = trades.filter(t => t.pnl <= 0);
+            const winRate = (wins.length / trades.length) * 100;
+            const totalPnL = trades.reduce((sum, t) => sum + t.pnl, 0);
+            const totalWins = wins.reduce((sum, t) => sum + t.pnl, 0);
+            const totalLosses = Math.abs(losses.reduce((sum, t) => sum + t.pnl, 0));
+            const profitFactor = totalLosses > 0 ? totalWins / totalLosses : totalWins;
+            
+            document.getElementById('perfWinRate').textContent = winRate.toFixed(1) + '%';
+            document.getElementById('perfProfitFactor').textContent = profitFactor.toFixed(2);
+            document.getElementById('perfTotalTrades').textContent = trades.length;
+            document.getElementById('perfTotalPnL').textContent = '€' + totalPnL.toFixed(2);
+            document.getElementById('perfTotalPnL').style.color = totalPnL >= 0 ? 'var(--success)' : 'var(--danger)';
+            
+            const avgWin = wins.length > 0 ? totalWins / wins.length : 0;
+            const avgLoss = losses.length > 0 ? totalLosses / losses.length : 1;
+            const riskReward = avgWin / avgLoss;
+            const riskPerTrade = 0.02;
+            const capital = 10000;
+            const riskAmount = capital * riskPerTrade;
+            
+            const q = 1 - (winRate / 100);
+            const p = winRate / 100;
+            const r = riskReward;
+            let riskOfRuin = 0;
+            
+            if (p * r > q) {
+                riskOfRuin = Math.pow(q / (p * r), (capital / riskAmount));
+            } else {
+                riskOfRuin = 1;
+            }
+            
+            const ruinEl = document.getElementById('riskOfRuin');
+            ruinEl.textContent = `Probabilidade: ${(riskOfRuin * 100).toFixed(2)}%`;
+            
+            if (riskOfRuin < 0.1) {
+                ruinEl.className = 'risk-of-ruin risk-low';
+            } else if (riskOfRuin < 0.5) {
+                ruinEl.className = 'risk-of-ruin risk-medium';
+            } else {
+                ruinEl.className = 'risk-of-ruin risk-high';
+            }
+            
+            const currentCapital = capital + totalPnL;
+            document.getElementById('currentCapital').textContent = '€' + currentCapital.toLocaleString('pt-PT');
+            const progress = Math.min(100, Math.max(0, (currentCapital / capital) * 100));
+            document.getElementById('capitalProgress').style.width = progress + '%';
+            document.getElementById('capitalProgress').style.background = progress >= 100 ? 'var(--success)' : progress >= 80 ? 'var(--warning)' : 'var(--danger)';
+        }
+
+        // Paper Trading Toggle
+        function loadPaperTradingState() {
+            const paperTrading = localStorage.getItem('paperTrading') === 'true';
+            document.getElementById('paperTradingToggle').checked = paperTrading;
+            updateTradingModeUI(paperTrading);
+        }
+
+        document.getElementById('paperTradingToggle').addEventListener('change', function(e) {
+            const paperTrading = e.target.checked;
+            localStorage.setItem('paperTrading', paperTrading);
+            updateTradingModeUI(paperTrading);
+        });
+
+        function updateTradingModeUI(paperTrading) {
+            const banner = document.getElementById('paperTradingBanner');
+            if (paperTrading) {
+                banner.classList.add('active');
+            } else {
+                banner.classList.remove('active');
+            }
+        }
+
+        // Session Status
+        function updateSessionStatus() {
+            const now = new Date();
+            const utcHour = now.getUTCHours();
+            
+            const londonOpen = utcHour >= 8 && utcHour < 16;
+            document.getElementById('londonSession').textContent = londonOpen ? 'Aberto' : 'Fechado';
+            document.getElementById('londonSession').className = `session-indicator ${londonOpen ? 'session-open' : 'session-closed'}`;
+            
+            const nyOpen = utcHour >= 13 && utcHour < 20;
+            document.getElementById('nySession').textContent = nyOpen ? 'Aberto' : 'Fechado';
+            document.getElementById('nySession').className = `session-indicator ${nyOpen ? 'session-open' : 'session-closed'}`;
+            
+            const asiaOpen = utcHour >= 0 && utcHour < 8;
+            document.getElementById('asiaSession').textContent = asiaOpen ? 'Aberto' : 'Fechado';
+            document.getElementById('asiaSession').className = `session-indicator ${asiaOpen ? 'session-open' : 'session-closed'}`;
+            
+            const anyOpen = londonOpen || nyOpen || asiaOpen;
+            document.getElementById('sessionStatus').textContent = anyOpen ? 'Mercado Aberto' : 'Mercado Fechado';
+            document.getElementById('sessionStatus').className = `session-indicator ${anyOpen ? 'session-open' : 'session-closed'}`;
+        }
+
+        // Cookie Management
+        function checkCookies() {
+            if (!localStorage.getItem('cookiesAccepted')) {
+                document.getElementById('cookieBanner').style.display = 'block';
+            }
+        }
+
+        function acceptCookies() {
+            localStorage.setItem('cookiesAccepted', 'true');
+            document.getElementById('cookieBanner').style.display = 'none';
+        }
+
+        function declineCookies() {
+            localStorage.setItem('cookiesAccepted', 'false');
+            document.getElementById('cookieBanner').style.display = 'none';
+        }
+
+        // Dark Mode
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            localStorage.setItem('darkMode', document.body.classList.contains('dark-mode'));
+        }
+
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark-mode');
+        }
+
+        // Modal Functions
+        function openModal(modalId) {
+            document.getElementById(modalId).style.display = 'block';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        // Toast Notifications
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type}`;
+            toast.style.display = 'block';
+            
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+
+        // Export Functions
+        function exportData() {
+            const data = {
+                capital: document.getElementById('capital').value,
+                riskPercent: document.getElementById('riskPercent').value,
+                journal: JSON.parse(localStorage.getItem('tradingJournal') || '[]'),
+                history: JSON.parse(localStorage.getItem('signalHistory') || '[]'),
+                exportDate: new Date().toISOString()
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `cfd-analyzer-export-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            showToast('✅ Dados exportados!', 'success');
+        }
+
+        function exportForIRS() {
+            const history = JSON.parse(localStorage.getItem('signalHistory') || '[]');
+            
+            let csv = 'Data,Tipo,Ativo,Lucro/Perda,Custos,Moeda\n';
+            history.forEach(signal => {
+                csv += `${new Date(signal.date).toISOString().split('T')[0]},${signal.direction},${signal.symbol},${signal.pnl || 0},0,EUR\n`;
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `declaracao-irs-anexo-j-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            
+            showToast('⚠️ Ficheiro exportado para IRS!', 'warning');
+        }
+
+        function exportToExcel() {
+            exportData();
+            showToast('📈 Exportado para análise!', 'success');
+        }
+
+        // Clear All Data
+        function clearAllData() {
+            if (confirm('⚠️ TEM A CERTEZA? Isto apaga TODOS os dados permanentemente!')) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
+        // Watchlist Functions
+        function setAlert(symbol) {
+            showToast(`🔔 Alerta definido para ${symbol}!`, 'success');
+        }
+
+        function removeFromWatchlist(symbol) {
+            showToast(`🗑️ ${symbol} removido da watchlist`, 'success');
+        }
+
+        function addToWatchlist() {
+            const symbol = prompt('Digite o símbolo do ativo (ex: EURUSD):');
+            if (symbol) {
+                showToast(`✅ ${symbol} adicionado à watchlist!`, 'success');
+            }
+        }
+
+        // Helper Functions
+        function formatPrice(price, symbol) {
+            if (symbol.includes('JPY')) return price.toFixed(2);
+            if (symbol.includes('USD') && price > 100) return price.toFixed(2);
+            return price.toFixed(4);
+        }
+
+        function getCategoryName(category) {
+            const names = {
+                forex: 'Forex',
+                indices: 'Índices',
+                commodities: 'Commodities',
+                crypto: 'Criptomoedas',
+                stocks: 'Ações'
+            };
+            return names[category] || category;
+        }
+
+        function getConfluenceColor(value) {
+            if (value >= 70) return 'var(--success)';
+            if (value >= 50) return 'var(--warning)';
+            return 'var(--danger)';
+        }
+
+        function getVolatility(symbol) {
+            const item = Object.values(cfdLibrary).flat().find(i => i.symbol === symbol);
+            return item ? item.volatility : 'N/A';
+        }
+
+        function getSpread(symbol) {
+            const item = Object.values(cfdLibrary).flat().find(i => i.symbol === symbol);
+            return item ? item.spread : 'N/A';
+        }
+
+        function getLeverage(category) {
+            const lev = { forex: 30, indices: 20, commodities: 20, crypto: 5, stocks: 5 };
+            return lev[category] || 5;
+        }
+
+        function getBestSession(category) {
+            const sessions = {
+                forex: 'Londres/NY',
+                indices: 'NY',
+                commodities: 'NY',
+                crypto: '24/7',
+                stocks: 'NY'
+            };
+            return sessions[category] || 'N/A';
+        }
+
+        function selectOpportunity(symbol) {
+            switchTab('calculator');
+            document.getElementById('entryPrice').focus();
+            showToast(`📊 ${symbol} selecionado! Preencha os dados na calculadora.`, 'success');
+        }
+
+        function selectFromLibrary(item) {
+            showToast(`📚 ${item.symbol} - ${item.name}\nSpread: ${item.spread} | Alavancagem: 1:${item.leverage}`, 'success');
+        }
+
+        // Close modals on outside click
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
+
+        // Input listeners for real-time updates
+        ['capital', 'riskPercent'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input', updateRiskStats);
+        });
+    </script>
+</body>
+</html>
