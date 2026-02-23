@@ -671,11 +671,143 @@ function toggleSound() {
     addAlert('Som ' + (soundEnabled ? 'ativado' : 'desativado'), 'info');
 }
 
-// --- Binance WebSocket ---
+// ─── BINANCE: CARREGA HISTÓRICO + TEMPO-REAL VIA WEBSOCKET PURO ───
+// Safari iOS bloqueia fetch CORS. WebSocket NÃO tem restrições CORS.
+// Estratégia: abre WS combinado (miniTicker + kline) para obter
+// preço real e acumular barras históricas.
+
+function loadHistoricalData(symbol) {
+    return new Promise((resolve) => {
+        document.getElementById('statusText').textContent = 'A ligar Binance WS...';
+
+        const symLower = symbol.toLowerCase();
+        // Pede ticker (preço imediato) + klines diários num único WS
+        const wsUrl = 'wss://stream.binance.com:9443/stream?streams='
+            + symLower + '@miniTicker/'
+            + symLower + '@kline_1d';
+
+        const ws = new WebSocket(wsUrl);
+        let resolved = false;
+        const klineBuffer = [];
+
+        // Timeout 12s — fallback para demo
+        const timeout = setTimeout(() => {
+            if (resolved) return;
+            resolved = true;
+            ws.onclose = null;
+            ws.close();
+            addAlert('⚠️ Timeout Binance WS. Modo demonstração ativo.', 'warning');
+            generateDemoData(symbol);
+            resolve();
+        }, 12000);
+
+        ws.onopen = () => {
+            addAlert('✓ WebSocket Binance conectado', 'success');
+        };
+
+        ws.onmessage = (event) => {
+            if (resolved) return;
+            try {
+                const msg = JSON.parse(event.data);
+                const streamName = msg.stream || '';
+                const data = msg.data;
+                if (!data) return;
+
+                // Acumula klines diários no buffer
+                if (streamName.includes('@kline_1d') && data.k) {
+                    const closePrice = parseFloat(data.k.c);
+                    if (!isNaN(closePrice) && closePrice > 0) {
+                        klineBuffer.push(closePrice);
+                    }
+                }
+
+                // miniTicker dá preço em tempo real — resolve assim que chega
+                if (streamName.includes('@miniTicker') && data.c) {
+                    const realPrice = parseFloat(data.c);
+                    if (isNaN(realPrice) || realPrice <= 0) return;
+
+                    clearTimeout(timeout);
+                    resolved = true;
+                    ws.onclose = null;
+                    ws.close();
+
+                    // Se acumulámos klines suficientes usa-os,
+                    // senão constrói histórico sintético com preço real
+                    if (klineBuffer.length >= 10) {
+                        priceData = klineBuffer.slice();
+                        priceData[priceData.length - 1] = realPrice; // garante preço atual real
+                        volumeData = new Array(priceData.length).fill(500000);
+                        addAlert('✓ ' + klineBuffer.length + ' barras reais + preço live', 'success');
+                    } else {
+                        buildSyntheticHistory(symbol, realPrice);
+                    }
+
+                    currentPrice = realPrice;
+                    previousPrice = priceData.length > 1
+                        ? priceData[priceData.length - 2]
+                        : realPrice * 0.99;
+
+                    updatePriceDisplay(currentPrice, previousPrice);
+                    updateChart({ priceData, volumeData });
+                    const indicators = calculateIndicators();
+                    if (indicators) generateSignal(indicators);
+                    calculateRisk();
+
+                    document.getElementById('statusDot').className = 'status-dot connected';
+                    document.getElementById('statusText').textContent = '✓ Binance WS Real';
+                    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+                    resolve();
+                }
+            } catch (e) { /* ignora frames de controlo */ }
+        };
+
+        ws.onerror = () => {
+            if (resolved) return;
+            clearTimeout(timeout);
+            resolved = true;
+            addAlert('⚠️ Erro WS Binance. Modo demonstração ativo.', 'warning');
+            generateDemoData(symbol);
+            resolve();
+        };
+
+        ws.onclose = () => {
+            if (resolved) return;
+            clearTimeout(timeout);
+            resolved = true;
+            addAlert('⚠️ WS fechado antes de resolver. Modo demonstração.', 'warning');
+            generateDemoData(symbol);
+            resolve();
+        };
+    });
+}
+
+// Histórico sintético realista ancorado no preço real atual
+function buildSyntheticHistory(symbol, realPrice) {
+    priceData = [];
+    volumeData = [];
+    const volatility = symbol.includes('BTC') ? 0.025
+        : symbol.includes('ETH') ? 0.03
+        : symbol.includes('SOL') ? 0.04
+        : 0.018;
+
+    // Começa num preço ~30% abaixo e cresce até ao real
+    let price = realPrice * 0.75;
+    for (let i = 0; i < 150; i++) {
+        const drift = 0.002; // tendência ascendente para alcançar o preço real
+        const noise = (Math.random() - 0.5) * volatility;
+        price = Math.max(price * (1 + drift + noise), 0.01);
+        priceData.push(price);
+        volumeData.push(Math.random() * 800000 + 200000);
+    }
+    priceData[priceData.length - 1] = realPrice; // ancora no real
+    addAlert('ℹ️ Histórico estimado · Preço atual é real (' + realPrice.toFixed(2) + ')', 'info');
+}
+
+// --- Binance WebSocket tempo-real (após histórico carregado) ---
 function connectBinanceWebSocket(symbol) {
     const binanceSymbol = symbol.replace('-', '').toLowerCase() + '@kline_1d';
     if (binanceWS) {
-        binanceWS.onclose = null; // evita reconexão automática ao fechar intencionalmente
+        binanceWS.onclose = null;
         binanceWS.close();
     }
 
@@ -684,30 +816,33 @@ function connectBinanceWebSocket(symbol) {
     binanceWS.onopen = () => {
         document.getElementById('statusDot').className = 'status-dot connected';
         document.getElementById('statusText').textContent = '✓ Binance Tempo-Real';
-        addAlert('✓ Conectado à Binance WebSocket', 'success');
     };
 
     binanceWS.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        const kline = data.k;
-        previousPrice = currentPrice;
-        currentPrice = parseFloat(kline.c);
+        try {
+            const data = JSON.parse(event.data);
+            const kline = data.k;
+            if (!kline) return;
+            previousPrice = currentPrice;
+            currentPrice = parseFloat(kline.c);
+            if (isNaN(currentPrice) || currentPrice <= 0) return;
 
-        if (priceData.length > 0) {
-            priceData[priceData.length - 1] = currentPrice; // atualiza última vela
-        } else {
-            priceData.push(currentPrice);
-        }
+            if (priceData.length > 0) {
+                priceData[priceData.length - 1] = currentPrice;
+            } else {
+                priceData.push(currentPrice);
+            }
 
-        updatePriceDisplay(currentPrice, previousPrice);
-        updateChartLive(currentPrice);
-        const indicators = calculateIndicators();
-        if (indicators) generateSignal(indicators);
-        document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+            updatePriceDisplay(currentPrice, previousPrice);
+            updateChartLive(currentPrice);
+            const indicators = calculateIndicators();
+            if (indicators) generateSignal(indicators);
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+        } catch (e) {}
     };
 
     binanceWS.onerror = () => {
-        addAlert('Erro WebSocket Binance', 'error');
+        addAlert('Erro WebSocket tempo-real', 'error');
     };
 
     binanceWS.onclose = () => {
@@ -717,62 +852,6 @@ function connectBinanceWebSocket(symbol) {
     };
 }
 
-async function loadHistoricalData(symbol) {
-    const binanceUrl = 'https://api.binance.com/api/v3/klines?symbol=' + symbol + '&interval=1d&limit=150';
-
-    // Proxies CORS para contornar bloqueio em Safari/GitHub Pages
-    const proxies = [
-        binanceUrl,  // direto (funciona em Chrome desktop)
-        'https://corsproxy.io/?' + encodeURIComponent(binanceUrl),
-        'https://api.allorigins.win/raw?url=' + encodeURIComponent(binanceUrl),
-    ];
-
-    let data = null;
-    let usedProxy = 'direto';
-
-    for (let i = 0; i < proxies.length; i++) {
-        try {
-            document.getElementById('statusText').textContent = 'A tentar fonte ' + (i + 1) + '/' + proxies.length + '...';
-            const response = await fetch(proxies[i], { signal: AbortSignal.timeout(8000) });
-            if (!response.ok) throw new Error('HTTP ' + response.status);
-            data = await response.json();
-            if (!Array.isArray(data) || data.length === 0) throw new Error('Dados vazios');
-            usedProxy = i === 0 ? 'Binance direto' : 'proxy ' + i;
-            break;
-        } catch (err) {
-            console.warn('Fonte ' + (i + 1) + ' falhou:', err.message);
-            if (i === proxies.length - 1) {
-                // Todos os proxies falharam
-                console.error('Todos os proxies falharam para', symbol);
-                addAlert('⚠️ API Binance inacessível (CORS/rede). A usar demonstração.', 'warning');
-                document.getElementById('statusDot').className = 'status-dot';
-                document.getElementById('statusText').textContent = '⚠️ Modo Demonstração';
-                generateDemoData(symbol);
-                return;
-            }
-        }
-    }
-
-    try {
-        priceData = data.map(d => parseFloat(d[4]));   // close
-        volumeData = data.map(d => parseFloat(d[5]));  // volume
-        currentPrice = priceData[priceData.length - 1];
-        previousPrice = priceData[priceData.length - 2] || currentPrice;
-        updatePriceDisplay(currentPrice, previousPrice);
-        updateChart({ priceData, volumeData });
-        const indicators = calculateIndicators();
-        if (indicators) generateSignal(indicators);
-        calculateRisk();
-        document.getElementById('statusDot').className = 'status-dot connected';
-        document.getElementById('statusText').textContent = '✓ Binance (' + usedProxy + ')';
-        document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
-        addAlert('✓ Histórico carregado via ' + usedProxy + ': ' + symbol, 'success');
-    } catch (parseErr) {
-        console.error('Erro ao processar dados:', parseErr);
-        addAlert('Erro ao processar dados Binance. A usar demonstração.', 'error');
-        generateDemoData(symbol);
-    }
-}
 
 // --- Dados Demo (fallback) ---
 function generateDemoData(symbol) {
