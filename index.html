@@ -718,12 +718,44 @@ function connectBinanceWebSocket(symbol) {
 }
 
 async function loadHistoricalData(symbol) {
+    const binanceUrl = 'https://api.binance.com/api/v3/klines?symbol=' + symbol + '&interval=1d&limit=150';
+
+    // Proxies CORS para contornar bloqueio em Safari/GitHub Pages
+    const proxies = [
+        binanceUrl,  // direto (funciona em Chrome desktop)
+        'https://corsproxy.io/?' + encodeURIComponent(binanceUrl),
+        'https://api.allorigins.win/raw?url=' + encodeURIComponent(binanceUrl),
+    ];
+
+    let data = null;
+    let usedProxy = 'direto';
+
+    for (let i = 0; i < proxies.length; i++) {
+        try {
+            document.getElementById('statusText').textContent = 'A tentar fonte ' + (i + 1) + '/' + proxies.length + '...';
+            const response = await fetch(proxies[i], { signal: AbortSignal.timeout(8000) });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            data = await response.json();
+            if (!Array.isArray(data) || data.length === 0) throw new Error('Dados vazios');
+            usedProxy = i === 0 ? 'Binance direto' : 'proxy ' + i;
+            break;
+        } catch (err) {
+            console.warn('Fonte ' + (i + 1) + ' falhou:', err.message);
+            if (i === proxies.length - 1) {
+                // Todos os proxies falharam
+                console.error('Todos os proxies falharam para', symbol);
+                addAlert('⚠️ API Binance inacessível (CORS/rede). A usar demonstração.', 'warning');
+                document.getElementById('statusDot').className = 'status-dot';
+                document.getElementById('statusText').textContent = '⚠️ Modo Demonstração';
+                generateDemoData(symbol);
+                return;
+            }
+        }
+    }
+
     try {
-        const response = await fetch('https://api.binance.com/api/v3/klines?symbol=' + symbol + '&interval=1d&limit=150');
-        if (!response.ok) throw new Error('Resposta inválida');
-        const data = await response.json();
-        priceData = data.map(d => parseFloat(d[4]));  // close prices
-        volumeData = data.map(d => parseFloat(d[5]));
+        priceData = data.map(d => parseFloat(d[4]));   // close
+        volumeData = data.map(d => parseFloat(d[5]));  // volume
         currentPrice = priceData[priceData.length - 1];
         previousPrice = priceData[priceData.length - 2] || currentPrice;
         updatePriceDisplay(currentPrice, previousPrice);
@@ -731,10 +763,13 @@ async function loadHistoricalData(symbol) {
         const indicators = calculateIndicators();
         if (indicators) generateSignal(indicators);
         calculateRisk();
-        addAlert('✓ Dados históricos carregados: ' + symbol, 'success');
-    } catch (error) {
-        console.error('Erro Binance histórico:', error);
-        addAlert('Erro ao carregar histórico Binance. Verifica o símbolo.', 'error');
+        document.getElementById('statusDot').className = 'status-dot connected';
+        document.getElementById('statusText').textContent = '✓ Binance (' + usedProxy + ')';
+        document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+        addAlert('✓ Histórico carregado via ' + usedProxy + ': ' + symbol, 'success');
+    } catch (parseErr) {
+        console.error('Erro ao processar dados:', parseErr);
+        addAlert('Erro ao processar dados Binance. A usar demonstração.', 'error');
         generateDemoData(symbol);
     }
 }
