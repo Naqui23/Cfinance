@@ -539,13 +539,33 @@ function pY(j){
 try{var r=j.chart.result[0],ts=r.timestamp,q=r.indicators.quote[0];if(!ts||!q.close)return null;
 var c=[];for(var i=0;i<ts.length;i++){if(q.close[i]==null)continue;c.push({date:new Date(ts[i]*1000).toISOString().split(‘T’)[0],o:q.open[i]||q.close[i],h:q.high[i]||q.close[i],l:q.low[i]||q.close[i],c:q.close[i],v:q.volume?(q.volume[i]||0):0})}return c}catch(e){return null}
 }
+function launchApp(){
+document.getElementById(‘splashScreen’).style.display=‘none’;
+document.getElementById(‘dashboard’).classList.add(‘active’);
+splashLog=null;initUI();refresh();
+}
 async function startApp(){
-var st=document.getElementById(‘splashStatus’);st.style.display=‘block’;splashLog=st;logSplash(‘A testar ligação ao Yahoo Finance…’);
-try{var d=await yf(‘AAPL’,‘1d’,‘5d’);if(d&&d.length>0){logSplash(‘Conectado! A carregar…’,‘var(–green)’);setTimeout(function(){document.getElementById(‘splashScreen’).style.display=‘none’;document.getElementById(‘dashboard’).classList.add(‘active’);splashLog=null;initUI();refresh()},300);return}
-logSplash(‘A tentar crypto…’,‘var(–amber)’);var d2=await yf(‘BTC-USD’,‘1d’,‘5d’);if(d2&&d2.length>0){logSplash(‘Conectado! A carregar…’,‘var(–green)’);setTimeout(function(){document.getElementById(‘splashScreen’).style.display=‘none’;document.getElementById(‘dashboard’).classList.add(‘active’);splashLog=null;initUI();refresh()},300);return}
-}catch(e){console.error(’[CFD] startApp error:’,e)}
-logSplash(‘Todos os proxies falharam. Verifica a internet ou tenta mais tarde.’,‘var(–red)’);
-st.innerHTML+=’<br><button onclick="startApp()" style="margin-top:10px;padding:8px 20px;border:none;border-radius:8px;background:var(--blue);color:#fff;font-family:var(--heading);font-size:12px;cursor:pointer">↻ Tentar de novo</button>’;
+var st=document.getElementById(‘splashStatus’);st.style.display=‘block’;splashLog=st;
+logSplash(‘A ligar ao Yahoo Finance…’);
+// Unregister old service workers to avoid stale cache
+if(‘serviceWorker’ in navigator){
+try{var regs=await navigator.serviceWorker.getRegistrations();for(var i=0;i<regs.length;i++)await regs[i].unregister()}catch(e){}
+}
+try{
+var d=await yf(‘AAPL’,‘1d’,‘5d’);
+if(d&&d.length>0){logSplash(‘Conectado!’,‘var(–green)’);setTimeout(launchApp,300);return}
+logSplash(‘A tentar alternativa…’,‘var(–amber)’);
+var d2=await yf(‘BTC-USD’,‘1d’,‘5d’);
+if(d2&&d2.length>0){logSplash(‘Conectado!’,‘var(–green)’);setTimeout(launchApp,300);return}
+var d3=await yf(‘EURUSD=X’,‘1d’,‘5d’);
+if(d3&&d3.length>0){logSplash(‘Conectado!’,‘var(–green)’);setTimeout(launchApp,300);return}
+}catch(e){console.error(’[CFD] startApp:’,e)}
+logSplash(‘Sem ligação — usa o modo offline ou verifica a internet.’,‘var(–red)’);
+st.innerHTML+=’<br><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center">’
++’<button onclick="startApp()" style="padding:8px 20px;border:none;border-radius:8px;background:var(--blue);color:#fff;font-family:var(--heading);font-size:12px;cursor:pointer">↻ Tentar de novo</button>’
++’<button onclick="launchApp()" style="padding:8px 20px;border:none;border-radius:8px;background:rgba(255,190,11,.15);color:var(--amber);border:1px solid rgba(255,190,11,.3);font-family:var(--heading);font-size:12px;cursor:pointer">📴 Entrar sem dados</button>’
++’</div>’
++’<div style="font-size:9px;color:var(--t3);margin-top:8px">Se usas iPhone: Settings → Safari → desliga VPN ou Bloqueador de Conteúdo</div>’;
 }
 
 /* ═══ INDICATORS ═══ */
