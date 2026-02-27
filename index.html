@@ -458,7 +458,11 @@ svg{width:100%;height:auto;display:block}
   </div>
 </div>
 <div id="tabStats" style="display:none"></div>
-<div id="tabCalendar" style="display:none"><div class="cal-wrap" id="calWrap"><div class="cal-loading">📅 Clica em "Calendário" para carregar eventos...</div></div></div>
+<div id="tabCalendar" style="display:none"><div style="display:flex;gap:6px;margin-bottom:8px">
+  <button id="calViewEvents" class="cal-filter-btn on" onclick="toggleCalView('events')">📅 Eventos</button>
+  <button id="calViewMacro" class="cal-filter-btn" onclick="toggleCalView('macro')">🌍 Visão Macro</button>
+</div>
+<div class="cal-wrap" id="calWrap"><div class="cal-loading">📅 Clica em "Calendário" para carregar eventos...</div></div></div>
 <div class="disclaimer">
 ⚠️ <strong>AVISO DE RISCO -- ESMA/XTB:</strong> CFDs são instrumentos complexos e apresentam risco elevado de perda rápida de capital devido à alavancagem. <strong style="color:var(--red)">Cerca de 75% das contas de investidores não profissionais perdem dinheiro ao negociar CFDs (fonte: XTB).</strong>
 <br><br>🤖 <strong>Co-piloto, não substituto:</strong> Sinais refletem <em>confluência de indicadores técnicos</em>, não probabilidade de lucro. Resultados passados não garantem desempenho futuro.
@@ -515,8 +519,10 @@ return{sym:sym,signal:signal,adx:lastAdx,bias:tf.bias};
 async function renderRotation(){
 var panel=document.getElementById('rotPanel');
 if(!panel)return;
-var recEl=document.getElementById('recValue');
-var isWaiting=recEl&&recEl.textContent==='AGUARDAR';
+// Accept passed signal or read from DOM
+var recText=(window._lastSignalType)?window._lastSignalType:'';
+if(!recText){var recEl=document.getElementById('recValue');recText=recEl?recEl.textContent:'';}
+var isWaiting=recText==='AGUARDAR'||recText==='';
 if(!isWaiting){panel.innerHTML='';return;}
 panel.innerHTML='<div class="rot-panel"><div class="rot-header"><div class="rot-title">\uD83D\uDD04 Rotação de Ativos <span class="rot-subtitle">-- a analisar…</span></div></div><div class="rot-grid"><div class="rot-loading">A verificar '+ROTATION_LIST.length+' ativos…</div></div></div>';
 var others=ROTATION_LIST.filter(function(r){return r.s!==sel});
@@ -953,6 +959,7 @@ var corrW=checkCorrelation(sel);var corrEl=document.getElementById('corrWarning'
 if(notif&&curEntry&&curEntry.type&&curEntry.date!==prevSig[sel]){try{new Notification((curEntry.type==='BUY'?'🟢 COMPRA':'🔴 VENDA')+' '+info.n)}catch(e){}prevSig[sel]=last.date}
 setSt('ok',info.n+' · '+candles.length+'D · '+new Date().toLocaleTimeString('pt',{hour:'2-digit',minute:'2-digit'}));
 /* ═══ ROTATION PANEL -- async after main analysis ═══ */
+window._lastSignalType=recTxt;
 renderRotation();
 }
 
@@ -1501,6 +1508,112 @@ function interpretEventImpact(ev, pairCcys, sym){
   };
 }
 
+
+/* ═══ MACRO VIEW — which pairs to watch this week ═══ */
+function renderMacroView(){
+  var wrap=document.getElementById('calWrap');
+  if(!wrap||!calData.length)return;
+  
+  var now=new Date();
+  // Get only high+medium impact events
+  var important=calData.filter(function(ev){
+    var imp=ev.Impact||ev.impact||'Low';
+    return imp==='High'||imp==='Medium';
+  });
+  
+  // Group by currency and find which pairs are most affected this week
+  var ccyEvents={};
+  important.forEach(function(ev){
+    var ccy=ev.Currency||ev.currency||'';
+    if(!ccy||ccy==='ALL')return;
+    if(!ccyEvents[ccy])ccyEvents[ccy]=[];
+    ccyEvents[ccy].push(ev);
+  });
+  
+  // Score each available pair by total events affecting it
+  var allPairs=[];
+  var pairSyms=Object.keys(PAIR_CURRENCIES);
+  pairSyms.forEach(function(sym){
+    var ccys=PAIR_CURRENCIES[sym];
+    if(ccys.length<2)return; // skip commodities/crypto for this view
+    var events=[];
+    ccys.forEach(function(ccy){if(ccyEvents[ccy])events=events.concat(ccyEvents[ccy])});
+    if(!events.length)return;
+    var highCount=events.filter(function(e){return(e.Impact||e.impact)==='High'}).length;
+    var medCount=events.filter(function(e){return(e.Impact||e.impact)==='Medium'}).length;
+    var score=highCount*3+medCount;
+    // Get next upcoming event
+    var upcoming=events.filter(function(e){return e._dateObj&&e._dateObj>now}).sort(function(a,b){return a._dateObj-b._dateObj})[0];
+    allPairs.push({sym:sym,ccys:ccys,events:events,highCount:highCount,medCount:medCount,score:score,next:upcoming});
+  });
+  
+  allPairs.sort(function(a,b){return b.score-a.score});
+  
+  // Find a preset name for each sym
+  var allPresets=presets||[];
+  function getPresetInfo(sym){
+    return allPresets.find(function(p){return p.s===sym})||{n:sym.replace('=X',''),e:'💱'};
+  }
+  
+  var h='<div style="margin-bottom:12px">';
+  h+='<div style="font-family:var(--heading);font-size:11px;font-weight:700;color:var(--cyan);margin-bottom:8px">🌍 Visão Macro — Pares mais ativos esta semana</div>';
+  h+='<div style="font-size:8px;color:var(--t3);margin-bottom:12px">Ordenado por número de eventos de impacto alto/médio. Mais eventos = mais volatilidade = mais oportunidade (e risco).</div>';
+  
+  if(!allPairs.length){
+    h+='<div class="cal-empty">Carrega o calendário primeiro para ver a visão macro.</div>';
+  } else {
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+    allPairs.slice(0,8).forEach(function(p,i){
+      var info=getPresetInfo(p.sym);
+      var intensity=i<2?'rgba(255,71,87,.08)':i<4?'rgba(255,190,11,.05)':'rgba(30,42,58,.3)';
+      var borderColor=i<2?'rgba(255,71,87,.25)':i<4?'rgba(255,190,11,.2)':'var(--bd)';
+      h+='<div style="padding:8px 10px;border-radius:9px;background:'+intensity+';border:1px solid '+borderColor+'">';
+      h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+      h+='<span style="font-family:var(--heading);font-size:10px;font-weight:700;color:var(--t)">'+info.e+' '+info.n+'</span>';
+      h+='<span style="font-size:8px;font-weight:700;color:'+(i<2?'var(--red)':i<4?'var(--amber)':'var(--t3)')+'">'+p.score+' pts</span>';
+      h+='</div>';
+      if(p.highCount>0)h+='<div style="font-size:8px;color:var(--red)">🔴 '+p.highCount+' eventos altos</div>';
+      if(p.medCount>0)h+='<div style="font-size:8px;color:var(--amber)">🟡 '+p.medCount+' eventos médios</div>';
+      if(p.next){
+        h+='<div style="font-size:7px;color:var(--t3);margin-top:3px">Próx: '+p.next._time+' — '+(p.next.Name||'').slice(0,20)+'</div>';
+      }
+      h+='<button onclick="selA(this.dataset.sym)" data-sym="'+p.sym+'" style="margin-top:6px;width:100%;padding:4px;border:none;border-radius:5px;background:rgba(91,127,255,.1);color:var(--blue);font-size:7px;font-family:var(--heading);cursor:pointer;font-weight:600">Analisar →</button>';
+      h+='</div>';
+    });
+    h+='</div>';
+    
+    // Bottom note about volatility
+    h+='<div style="margin-top:10px;padding:8px 10px;border-radius:7px;font-size:8px;background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.1);color:var(--t3)">';
+    h+='💡 <strong style="color:var(--cyan)">Estratégia macro:</strong> Pares com muitos eventos = mais volatilidade mas maior spread efetivo. Para conta pequena, considera pares de menor atividade com tendência clara.';
+    h+='</div>';
+  }
+  
+  h+='</div>';
+  return h;
+}
+
+var calViewMode='events'; // 'events' or 'macro'
+
+function toggleCalView(mode){
+  calViewMode=mode;
+  document.getElementById('calViewEvents').classList.toggle('on',mode==='events');
+  document.getElementById('calViewMacro').classList.toggle('on',mode==='macro');
+  if(mode==='macro'){
+    var wrap=document.getElementById('calWrap');
+    if(wrap){
+      // Run formatCalTime on all events first so _dateObj is available
+      if(calData.length){
+        calData.forEach(function(ev){
+          if(!ev._dateObj){var t=formatCalTime(ev.Date||ev.date||'');ev._time=t.time;ev._dateKey=t.date;ev._dateObj=t.dateObj;}
+        });
+      }
+      wrap.innerHTML=renderMacroView();
+    }
+  } else {
+    renderCalendar();
+  }
+}
+
 function renderCalendar(){
   var wrap=document.getElementById('calWrap');
   if(!wrap)return;
@@ -1693,50 +1806,126 @@ async function loadCalendar(force){
   calLoadingInProgress=true;
   
   var wrap=document.getElementById('calWrap');
-  if(wrap)wrap.innerHTML='<div class="cal-loading">⏳ A carregar calendário Forex Factory...</div>';
+  if(wrap)wrap.innerHTML='<div class="cal-loading">⏳ A carregar calendário de eventos...</div>';
   
-  // Try to fetch the week XML via CORS proxy
-  var xmlUrl='https://www.forexfactory.com/ff_calendar_thisweek.xml';
   var data=null;
   
-  for(var i=0;i<PX.length;i++){
-    try{
-      var proxyUrl=PX[i](xmlUrl);
-      var resp=await fetch(proxyUrl,{signal:AbortSignal.timeout(8000)});
-      if(!resp.ok)continue;
-      var text=await resp.text();
-      if(text&&text.indexOf('<event>')>0){
-        data=parseFFXML(text);
-        if(data&&data.length>0)break;
-      }
-    }catch(e){continue}
+  // Source 1: Investing.com via CORS proxy (JSON, reliable)
+  var sources=[
+    // TradingEconomics calendar (JSON, public, CORS-friendly via proxy)
+    {url:'https://tradingeconomics.com/calendar.json?c=forex',type:'te'},
+    // ForexFactory XML via proxy
+    {url:'https://www.forexfactory.com/ff_calendar_thisweek.xml',type:'xml'},
+    // FXStreet via proxy
+    {url:'https://calendar.fxstreet.com/eventdate/?view=week&fxst-timezone=Europe%2FLisbon',type:'fxs'}
+  ];
+  
+  // Try each source through each proxy
+  for(var si=0;si<sources.length&&(!data||!data.length);si++){
+    var src=sources[si];
+    for(var pi=0;pi<PX.length&&(!data||!data.length);pi++){
+      try{
+        var url=PX[pi](src.url);
+        var resp=await fetch(url,{signal:AbortSignal.timeout(7000)});
+        if(!resp.ok)continue;
+        if(src.type==='xml'){
+          var txt=await resp.text();
+          if(txt&&txt.indexOf('<event>')>0){data=parseFFXML(txt);break}
+        } else {
+          var json=await resp.json();
+          if(Array.isArray(json)&&json.length>0){
+            if(src.type==='te')data=parseTEJson(json);
+            else data=json;
+            break;
+          }
+        }
+      }catch(e){continue}
+    }
   }
   
-  // Fallback: try jblanked API (no key needed for basic week endpoint? test it)
+  // Final fallback: built-in static events for the week  
   if(!data||!data.length){
-    try{
-      var jbUrl='https://www.jblanked.com/news/api/mql5/calendar/week/?impact=High';
-      for(var i=0;i<PX.length;i++){
-        try{
-          var resp2=await fetch(PX[i](jbUrl),{signal:AbortSignal.timeout(8000)});
-          if(!resp2.ok)continue;
-          var json=await resp2.json();
-          if(Array.isArray(json)&&json.length>0){data=json;break}
-        }catch(e){continue}
-      }
-    }catch(e){}
+    data=getStaticCalendar();
   }
   
   calLoadingInProgress=false;
-  
-  if(!data||!data.length){
-    if(wrap)wrap.innerHTML='<div class="cal-error">❌ Não foi possível carregar o calendário.<br><small>Verifica a ligação à internet e tenta de novo.</small><br><button class="cal-refresh-btn" style="margin-top:10px" onclick="loadCalendar(true)">↻ Tentar de novo</button></div>';
-    return;
-  }
-  
   calData=data;
   calLoaded=true;
+  var isStatic=!data[0]||data[0]._static;
+  if(isStatic&&wrap){
+    var banner=document.createElement('div');
+    banner.style.cssText='padding:6px 10px;background:rgba(255,190,11,.06);border:1px solid rgba(255,190,11,.15);border-radius:7px;font-size:8px;color:var(--amber);margin-bottom:8px';
+    banner.textContent='⚠️ Dados em tempo real indisponíveis — a mostrar eventos recorrentes conhecidos. Liga/desliga VPN e tenta atualizar.';
+    wrap.innerHTML='';
+    wrap.appendChild(banner);
+  }
   renderCalendar();
+}
+
+function parseTEJson(arr){
+  return arr.map(function(ev){
+    return{
+      Name:ev.Event||ev.event||'',
+      Currency:ev.Currency||ev.currency||ev.Country||'',
+      Category:ev.Category||ev.category||'',
+      Impact:ev.Importance==='3'||ev.importance==='High'?'High':ev.Importance==='2'||ev.importance==='Medium'?'Medium':'Low',
+      Date:ev.Date||ev.date||'',
+      Forecast:ev.Forecast||ev.forecast||'',
+      Previous:ev.Previous||ev.previous||'',
+      Actual:ev.Actual||ev.actual||'',
+      Outcome:''
+    };
+  });
+}
+
+// Static fallback: recurring weekly events with approximate dates
+function getStaticCalendar(){
+  var now=new Date();
+  var events=[];
+  // Generate events for this week and next
+  var dow=now.getDay(); // 0=Sun
+  var monday=new Date(now);
+  monday.setDate(now.getDate()-(dow===0?6:dow-1));
+  monday.setHours(0,0,0,0);
+  
+  function dayOf(offset,hour,min){
+    var d=new Date(monday);
+    d.setDate(d.getDate()+offset);
+    d.setHours(hour,min,0,0);
+    // Return as UTC ISO for Lisbon conversion
+    return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')+' '+String(hour).padStart(2,'0')+':'+String(min).padStart(2,'0')+':00';
+  }
+  
+  var weekly=[
+    // Mon
+    {offset:0,h:10,m:0,Name:'Sentimento ZEW Alemanha',Currency:'EUR',Impact:'Medium',Category:'Confiança'},
+    // Tue
+    {offset:1,h:13,m:30,Name:'CPI EUA (mensal)',Currency:'USD',Impact:'High',Category:'Inflação'},
+    {offset:1,h:13,m:30,Name:'Balança Comercial Reino Unido',Currency:'GBP',Impact:'Medium',Category:'Comércio'},
+    // Wed
+    {offset:2,h:13,m:30,Name:'Pedidos Desemprego EUA',Currency:'USD',Impact:'Medium',Category:'Emprego'},
+    {offset:2,h:15,m:30,Name:'Inventários Petróleo EIA',Currency:'USD',Impact:'Medium',Category:'Energia'},
+    {offset:2,h:19,m:0,Name:'Atas FOMC',Currency:'USD',Impact:'High',Category:'Política Monetária'},
+    // Thu
+    {offset:3,h:12,m:0,Name:'Decisão Taxas Banco de Inglaterra',Currency:'GBP',Impact:'High',Category:'Política Monetária'},
+    {offset:3,h:13,m:30,Name:'Pedidos Desemprego Semanal EUA',Currency:'USD',Impact:'Medium',Category:'Emprego'},
+    {offset:3,h:14,m:15,Name:'BCE — Conferência de Imprensa',Currency:'EUR',Impact:'High',Category:'Política Monetária'},
+    // Fri
+    {offset:4,h:13,m:30,Name:'NFP — Emprego Não Agrícola EUA',Currency:'USD',Impact:'High',Category:'Emprego'},
+    {offset:4,h:13,m:30,Name:'Taxa de Desemprego EUA',Currency:'USD',Impact:'High',Category:'Emprego'},
+    {offset:4,h:13,m:30,Name:'Rendimento Médio Horário EUA',Currency:'USD',Impact:'Medium',Category:'Emprego'},
+    {offset:4,h:15,m:0,Name:'Confiança do Consumidor Michigan',Currency:'USD',Impact:'Medium',Category:'Confiança'},
+  ];
+  
+  weekly.forEach(function(ev){
+    events.push({
+      Name:ev.Name,Currency:ev.Currency,Category:ev.Category,
+      Impact:ev.Impact,Date:dayOf(ev.offset,ev.h,ev.m),
+      Forecast:'',Previous:'',Actual:'',Outcome:'',_static:true
+    });
+  });
+  
+  return events;
 }
 
 function parseFFXML(xmlText){
