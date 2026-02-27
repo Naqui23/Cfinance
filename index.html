@@ -276,6 +276,9 @@ svg{width:100%;height:auto;display:block}
 .cal-direction.uncertain{background:rgba(255,190,11,.06);border:1px solid rgba(255,190,11,.15);color:var(--amber)}
 .cal-direction-icon{font-size:11px}
 .cal-expected{display:flex;align-items:center;gap:5px;margin-top:4px;padding:4px 8px;border-radius:6px;font-size:8px;border:1px dashed rgba(91,127,255,.25);background:rgba(91,127,255,.03);color:#8b9cf7}
+
+.loading-card{opacity:.5;animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.5}50%{opacity:.8}}
 </style>
 </head>
 <body>
@@ -491,12 +494,18 @@ var PAPER_MODE=false;
 
 /* ═══ ROTATION WATCHLIST (conta 30€) ═══ */
 var ROTATION_LIST=[
-{s:'EURUSD=X',n:'EUR/USD',e:'\u{1F4B6}'},
-{s:'GBPUSD=X',n:'GBP/USD',e:'\u{1F4B7}'},
-{s:'JPY=X',n:'USD/JPY',e:'\u{1F1EF}\u{1F1F5}'},
-{s:'GC=F',n:'Ouro',e:'\u{1F947}'},
-{s:'BZ=F',n:'Petróleo',e:'\u{1F6E2}\u{FE0F}'},
-{s:'AUDUSD=X',n:'AUD/USD',e:'\u{1F998}'}
+  {s:'EURUSD=X',n:'EUR/USD',e:'💶'},
+  {s:'GBPUSD=X',n:'GBP/USD',e:'💷'},
+  {s:'JPY=X',n:'USD/JPY',e:'💴'},
+  {s:'CHF=X',n:'USD/CHF',e:'🇨🇭'},
+  {s:'AUDUSD=X',n:'AUD/USD',e:'🦘'},
+  {s:'AUDJPY=X',n:'AUD/JPY',e:'🦘'},
+  {s:'EURJPY=X',n:'EUR/JPY',e:'💶'},
+  {s:'GBPJPY=X',n:'GBP/JPY',e:'💷'},
+  {s:'EURGBP=X',n:'EUR/GBP',e:'🇪🇺'},
+  {s:'CAD=X',n:'USD/CAD',e:'🇨🇦'},
+  {s:'GC=F',n:'Ouro',e:'🥇'},
+  {s:'BZ=F',n:'Petróleo',e:'🛢️'}
 ];
 
 async function quickAnalyze(sym){
@@ -519,39 +528,124 @@ return{sym:sym,signal:signal,adx:lastAdx,bias:tf.bias};
 async function renderRotation(){
 var panel=document.getElementById('rotPanel');
 if(!panel)return;
-// Accept passed signal or read from DOM
-var recText=(window._lastSignalType)?window._lastSignalType:'';
+
+// Check signal state
+var recText=(window._lastSignalType)||'';
 if(!recText){var recEl=document.getElementById('recValue');recText=recEl?recEl.textContent:'';}
-var isWaiting=recText==='AGUARDAR'||recText==='';
+var isWaiting=(recText==='AGUARDAR');
 if(!isWaiting){panel.innerHTML='';return;}
-panel.innerHTML='<div class="rot-panel"><div class="rot-header"><div class="rot-title">\uD83D\uDD04 Rotação de Ativos <span class="rot-subtitle">-- a analisar…</span></div></div><div class="rot-grid"><div class="rot-loading">A verificar '+ROTATION_LIST.length+' ativos…</div></div></div>';
+
+// Get rotation candidates (exclude current)
 var others=ROTATION_LIST.filter(function(r){return r.s!==sel});
-var results=await Promise.all(others.map(function(r){return quickAnalyze(r.s).then(function(res){res.name=r.n;res.emoji=r.e;return res})}));
-results.sort(function(a,b){
-var aHas=(a.signal==='BUY'||a.signal==='SELL')?1:0;
-var bHas=(b.signal==='BUY'||b.signal==='SELL')?1:0;
-if(aHas!==bHas)return bHas-aHas;
-return(b.adx||0)-(a.adx||0);
-});
-var bestCount=results.filter(function(r){return r.signal==='BUY'||r.signal==='SELL'}).length;
-var header='<div class="rot-header"><div class="rot-title">\uD83D\uDD04 Rotação de Ativos <span class="rot-subtitle">-- clica para abrir</span></div><div style="font-size:8px;color:'+(bestCount>0?'var(--green)':'var(--t3)')+'">'+(bestCount>0?bestCount+' com sinal ativo':'Todos laterais')+'</div></div>';
-var grid='<div class="rot-grid">';
-results.forEach(function(r){
-var hasSig=r.signal==='BUY'||r.signal==='SELL';
-var adxOk=r.adx!=null&&r.adx>=20;
-var cardClass=hasSig&&adxOk?'green':hasSig?'amber':'';
-var sigClass=r.signal==='BUY'?'buy':r.signal==='SELL'?'sell':'wait';
-var sigLabel=r.signal==='BUY'?'\u25B2 COMPRA':r.signal==='SELL'?'\u25BC VENDA':'\u23F3 AGUARDAR';
-var biasColor=r.bias==='Bullish'?'var(--green)':r.bias==='Bearish'?'var(--red)':'var(--t3)';
-var adxTxt=r.adx!=null?(r.adx<20?'ADX '+r.adx.toFixed(0)+' lateral':r.adx>=25?'ADX '+r.adx.toFixed(0)+' forte':'ADX '+r.adx.toFixed(0)+' fraco'):'Sem dados';
-var safeS=r.sym;
-grid+='<div class="rot-card '+cardClass+'" onclick="selA(\''+safeS+'\')"><div><div class="rot-name">'+r.emoji+' '+r.name+'</div><div class="rot-bias" style="color:'+biasColor+'">'+r.bias+'</div></div><div style="text-align:right"><div class="rot-signal '+sigClass+'">'+sigLabel+'</div><div class="rot-adx">'+adxTxt+'</div></div></div>';
-});
-grid+='</div>';
-var tip='<div class="rot-tip">\uD83D\uDCA1 Opera o ativo com sinal + ADX forte. Se todos aguardam, fica fora -- paciência é gestão de risco.</div>';
-var el=document.getElementById('rotPanel');
-if(el)el.innerHTML='<div class="rot-panel">'+header+grid+tip+'</div>';
+if(!others.length){panel.innerHTML='';return;}
+
+// Show skeleton cards immediately
+function skelCard(r){
+  return '<div class="rot-card loading-card" id="rotcard-'+r.s.replace(/[^a-z0-9]/gi,'_')+'">'
+    +'<div><div class="rot-name">'+r.e+' '+r.n+'</div>'
+    +'<div class="rot-bias" style="color:var(--t3)">A analisar...</div></div>'
+    +'<div style="text-align:right"><div class="rot-signal wait">⏳</div>'
+    +'<div class="rot-adx" style="color:var(--t3)">--</div></div></div>';
 }
+
+var skelGrid='<div class="rot-grid">'+others.map(skelCard).join('')+'</div>';
+panel.innerHTML='<div class="rot-panel">'
+  +'<div class="rot-header"><div class="rot-title">🔄 Rotação de Ativos <span class="rot-subtitle">— a analisar '+others.length+' ativos</span></div></div>'
+  +skelGrid
+  +'</div>';
+
+// Analyze each asset individually and update its card as results come in
+var results=[];
+var completed=0;
+
+function updateCard(r,result){
+  var cardId='rotcard-'+r.s.replace(/[^a-z0-9]/gi,'_');
+  var cardEl=document.getElementById(cardId);
+  if(!cardEl)return;
+  var hasSig=result.signal==='BUY'||result.signal==='SELL';
+  var adxOk=result.adx!=null&&result.adx>=20;
+  var cardClass=hasSig&&adxOk?'green':hasSig?'amber':'';
+  var sigClass=result.signal==='BUY'?'buy':result.signal==='SELL'?'sell':'wait';
+  var sigLabel=result.signal==='BUY'?'▲ COMPRA':result.signal==='SELL'?'▼ VENDA':'⏳ AGUARDAR';
+  var biasColor=result.bias==='Bullish'?'var(--green)':result.bias==='Bearish'?'var(--red)':'var(--t3)';
+  var adxTxt=result.adx!=null?(result.adx<20?'ADX '+result.adx.toFixed(0)+' lateral':result.adx>=25?'ADX '+result.adx.toFixed(0)+' forte':'ADX '+result.adx.toFixed(0)+' fraco'):'Sem dados';
+  cardEl.className='rot-card '+cardClass;
+  cardEl.innerHTML='<div><div class="rot-name">'+r.e+' '+r.n+'</div>'
+    +'<div class="rot-bias" style="color:'+biasColor+'">'+result.bias+'</div></div>'
+    +'<div style="text-align:right"><div class="rot-signal '+sigClass+'">'+sigLabel+'</div>'
+    +'<div class="rot-adx">'+adxTxt+'</div></div>';
+}
+
+function updateHeader(){
+  var withSig=results.filter(function(r){return r.signal==='BUY'||r.signal==='SELL'});
+  var hEl=panel.querySelector('.rot-subtitle');
+  if(!hEl)return;
+  if(completed<others.length){
+    hEl.textContent='— analisados '+completed+'/'+others.length;
+  } else {
+    hEl.textContent=withSig.length>0?'— '+withSig.length+' com sinal ativo':'— todos laterais';
+    // Sort cards: BUY/SELL first, then by ADX
+    var grid=panel.querySelector('.rot-grid');
+    if(grid){
+      var sorted=results.slice().sort(function(a,b){
+        var aHas=(a.signal==='BUY'||a.signal==='SELL')?1:0;
+        var bHas=(b.signal==='BUY'||b.signal==='SELL')?1:0;
+        if(aHas!==bHas)return bHas-aHas;
+        return(b.adx||0)-(a.adx||0);
+      });
+      // Re-render grid in sorted order
+      var newGrid='<div class="rot-grid">';
+      sorted.forEach(function(res){
+        var r=others.find(function(o){return o.s===res.sym});
+        if(!r)return;
+        var hasSig=res.signal==='BUY'||res.signal==='SELL';
+        var adxOk=res.adx!=null&&res.adx>=20;
+        var cc=hasSig&&adxOk?'green':hasSig?'amber':'';
+        var sc=res.signal==='BUY'?'buy':res.signal==='SELL'?'sell':'wait';
+        var sl=res.signal==='BUY'?'▲ COMPRA':res.signal==='SELL'?'▼ VENDA':'⏳ AGUARDAR';
+        var bc=res.bias==='Bullish'?'var(--green)':res.bias==='Bearish'?'var(--red)':'var(--t3)';
+        var at=res.adx!=null?(res.adx<20?'ADX '+res.adx.toFixed(0)+' lateral':res.adx>=25?'ADX '+res.adx.toFixed(0)+' forte':'ADX '+res.adx.toFixed(0)+' fraco'):'Sem dados';
+        newGrid+='<div class="rot-card '+cc+'" onclick="selA(this.dataset.sym)" data-sym="'+res.sym+'">'
+          +'<div><div class="rot-name">'+r.e+' '+r.n+'</div>'
+          +'<div class="rot-bias" style="color:'+bc+'">'+res.bias+'</div></div>'
+          +'<div style="text-align:right"><div class="rot-signal '+sc+'">'+sl+'</div>'
+          +'<div class="rot-adx">'+at+'</div></div></div>';
+      });
+      newGrid+='</div>';
+      var tip='<div class="rot-tip">💡 Opera o ativo com sinal + ADX forte. Se todos aguardam, fica fora — paciência é gestão de risco.</div>';
+      var oldGrid=panel.querySelector('.rot-grid');
+      if(oldGrid){oldGrid.outerHTML=newGrid+tip;}
+    }
+  }
+}
+
+// Analyze with timeout per asset (max 10s each)
+others.forEach(function(r){
+  var timeoutId;
+  var done=false;
+  var timeout=new Promise(function(resolve){
+    timeoutId=setTimeout(function(){
+      if(!done){done=true;resolve({sym:r.s,signal:'WAIT',adx:null,bias:'—'});}
+    },10000);
+  });
+  var analysis=quickAnalyze(r.s).then(function(res){
+    if(!done){done=true;clearTimeout(timeoutId);}
+    return res;
+  }).catch(function(){
+    clearTimeout(timeoutId);
+    return{sym:r.s,signal:'WAIT',adx:null,bias:'—'};
+  });
+  Promise.race([analysis,timeout]).then(function(result){
+    result.sym=r.s;
+    results.push(result);
+    completed++;
+    updateCard(r,result);
+    updateHeader();
+  });
+});
+
+}
+
 
 var XTB_SPREADS={
   'AAPL':0.08,'MSFT':0.10,'GOOGL':0.30,'TSLA':0.15,'NVDA':0.12,'AMZN':0.20,
@@ -1742,7 +1836,13 @@ function renderCalendar(){
         var icon=outc==='better'?'▲':outc==='worse'?'▼':'=';
         h+='<span class="cal-pill '+cls+'">'+icon+' Real: '+actual+'</span>';
       } else if(isPast){
-        h+='<span class="cal-pill prev">A aguardar...</span>';
+        // For past events without actual: show forecast as reference if available
+        if(forecast!=null&&forecast!==''){
+          h+='<span class="cal-pill forecast" style="opacity:.6">📊 Prev: '+forecast+'</span>';
+          h+='<span class="cal-pill prev" style="opacity:.5">Valor não publicado</span>';
+        } else {
+          h+='<span class="cal-pill prev">Sem dados</span>';
+        }
       }
       
       // Outcome text
@@ -1855,7 +1955,7 @@ async function loadCalendar(force){
   if(isStatic&&wrap){
     var banner=document.createElement('div');
     banner.style.cssText='padding:6px 10px;background:rgba(255,190,11,.06);border:1px solid rgba(255,190,11,.15);border-radius:7px;font-size:8px;color:var(--amber);margin-bottom:8px';
-    banner.textContent='⚠️ Dados em tempo real indisponíveis — a mostrar eventos recorrentes conhecidos. Liga/desliga VPN e tenta atualizar.';
+    banner.textContent='⚠️ Dados em tempo real indisponíveis — a mostrar eventos recorrentes típicos desta semana (valores de referência). Forecast/Anterior são estimativas baseadas em médias históricas.';
     wrap.innerHTML='';
     wrap.appendChild(banner);
   }
@@ -1896,32 +1996,39 @@ function getStaticCalendar(){
     return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')+' '+String(hour).padStart(2,'0')+':'+String(min).padStart(2,'0')+':00';
   }
   
+  // Note: Forecast/Previous values are approximate recent averages
+  // Real values will differ - use as reference only
   var weekly=[
     // Mon
-    {offset:0,h:10,m:0,Name:'Sentimento ZEW Alemanha',Currency:'EUR',Impact:'Medium',Category:'Confiança'},
+    {offset:0,h:10,m:0,Name:'Sentimento ZEW Alemanha',Currency:'EUR',Impact:'Medium',Category:'Confiança',Forecast:'12.0',Previous:'10.3'},
+    {offset:0,h:9,m:30,Name:'PMI Serviços Reino Unido',Currency:'GBP',Impact:'Medium',Category:'PMI',Forecast:'51.0',Previous:'50.8'},
     // Tue
-    {offset:1,h:13,m:30,Name:'CPI EUA (mensal)',Currency:'USD',Impact:'High',Category:'Inflação'},
-    {offset:1,h:13,m:30,Name:'Balança Comercial Reino Unido',Currency:'GBP',Impact:'Medium',Category:'Comércio'},
+    {offset:1,h:13,m:30,Name:'CPI EUA (mensal)',Currency:'USD',Impact:'High',Category:'Inflação',Forecast:'0.3%',Previous:'0.2%'},
+    {offset:1,h:13,m:30,Name:'CPI EUA (anual)',Currency:'USD',Impact:'High',Category:'Inflação',Forecast:'2.9%',Previous:'2.9%'},
+    {offset:1,h:13,m:30,Name:'CPI Core EUA (mensal)',Currency:'USD',Impact:'High',Category:'Inflação',Forecast:'0.3%',Previous:'0.2%'},
+    {offset:1,h:13,m:30,Name:'Balança Comercial Reino Unido',Currency:'GBP',Impact:'Medium',Category:'Comércio',Forecast:'-£3.5B',Previous:'-£3.2B'},
     // Wed
-    {offset:2,h:13,m:30,Name:'Pedidos Desemprego EUA',Currency:'USD',Impact:'Medium',Category:'Emprego'},
-    {offset:2,h:15,m:30,Name:'Inventários Petróleo EIA',Currency:'USD',Impact:'Medium',Category:'Energia'},
-    {offset:2,h:19,m:0,Name:'Atas FOMC',Currency:'USD',Impact:'High',Category:'Política Monetária'},
+    {offset:2,h:13,m:30,Name:'Pedidos Desemprego EUA',Currency:'USD',Impact:'Medium',Category:'Emprego',Forecast:'215K',Previous:'220K'},
+    {offset:2,h:15,m:30,Name:'Inventários Petróleo EIA',Currency:'USD',Impact:'Medium',Category:'Energia',Forecast:'-1.2M',Previous:'+2.3M'},
+    {offset:2,h:14,m:0,Name:'IPC Alemanha (mensal)',Currency:'EUR',Impact:'Medium',Category:'Inflação',Forecast:'0.3%',Previous:'0.1%'},
     // Thu
-    {offset:3,h:12,m:0,Name:'Decisão Taxas Banco de Inglaterra',Currency:'GBP',Impact:'High',Category:'Política Monetária'},
-    {offset:3,h:13,m:30,Name:'Pedidos Desemprego Semanal EUA',Currency:'USD',Impact:'Medium',Category:'Emprego'},
-    {offset:3,h:14,m:15,Name:'BCE — Conferência de Imprensa',Currency:'EUR',Impact:'High',Category:'Política Monetária'},
+    {offset:3,h:13,m:30,Name:'Pedidos Desemprego Semanal EUA',Currency:'USD',Impact:'Medium',Category:'Emprego',Forecast:'215K',Previous:'219K'},
+    {offset:3,h:13,m:30,Name:'PIB EUA (Trimestral)',Currency:'USD',Impact:'High',Category:'PIB',Forecast:'2.4%',Previous:'3.1%'},
+    {offset:3,h:12,m:0,Name:'Decisão Taxas Banco de Inglaterra',Currency:'GBP',Impact:'High',Category:'Política Monetária',Forecast:'4.50%',Previous:'4.75%'},
+    {offset:3,h:13,m:30,Name:'Balança Comercial EUA',Currency:'USD',Impact:'Medium',Category:'Comércio',Forecast:'-$96B',Previous:'-$98B'},
     // Fri
-    {offset:4,h:13,m:30,Name:'NFP — Emprego Não Agrícola EUA',Currency:'USD',Impact:'High',Category:'Emprego'},
-    {offset:4,h:13,m:30,Name:'Taxa de Desemprego EUA',Currency:'USD',Impact:'High',Category:'Emprego'},
-    {offset:4,h:13,m:30,Name:'Rendimento Médio Horário EUA',Currency:'USD',Impact:'Medium',Category:'Emprego'},
-    {offset:4,h:15,m:0,Name:'Confiança do Consumidor Michigan',Currency:'USD',Impact:'Medium',Category:'Confiança'},
+    {offset:4,h:13,m:30,Name:'NFP — Emprego Não Agrícola EUA',Currency:'USD',Impact:'High',Category:'Emprego',Forecast:'170K',Previous:'256K'},
+    {offset:4,h:13,m:30,Name:'Taxa de Desemprego EUA',Currency:'USD',Impact:'High',Category:'Emprego',Forecast:'4.1%',Previous:'4.1%'},
+    {offset:4,h:13,m:30,Name:'Rendimento Médio Horário EUA',Currency:'USD',Impact:'Medium',Category:'Emprego',Forecast:'0.3%',Previous:'0.3%'},
+    {offset:4,h:15,m:0,Name:'Confiança do Consumidor Michigan',Currency:'USD',Impact:'Medium',Category:'Confiança',Forecast:'67.8',Previous:'67.8'},
+    {offset:4,h:9,m:0,Name:'Emprego Reino Unido',Currency:'GBP',Impact:'High',Category:'Emprego',Forecast:'4.4%',Previous:'4.4%'},
   ];
   
   weekly.forEach(function(ev){
     events.push({
       Name:ev.Name,Currency:ev.Currency,Category:ev.Category,
       Impact:ev.Impact,Date:dayOf(ev.offset,ev.h,ev.m),
-      Forecast:'',Previous:'',Actual:'',Outcome:'',_static:true
+      Forecast:ev.Forecast||'',Previous:ev.Previous||'',Actual:'',Outcome:'',_static:true
     });
   });
   
