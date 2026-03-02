@@ -727,26 +727,137 @@ var PX=[
 function(u){return ‘https://corsproxy.io/?’+encodeURIComponent(u)},
 function(u){return ‘https://api.allorigins.win/raw?url=’+encodeURIComponent(u)},
 function(u){return ‘https://api.codetabs.com/v1/proxy?quest=’+encodeURIComponent(u)},
-function(u){return ‘https://cors.sh/?’+encodeURIComponent(u)},
-function(u){return ‘https://proxy.cors.sh/’+u}
+function(u){return ‘https://thingproxy.freeboard.io/fetch/’+u},
+function(u){return ‘https://api.cors.lol/?url=’+encodeURIComponent(u)},
+function(u){return ‘https://corsproxy.org/?’+encodeURIComponent(u)},
+function(u){return ‘https://proxy.cors.sh/’+u},
+function(u){return ‘https://cors.sh/?’+encodeURIComponent(u)}
 ];
 var wp=-1;
 var splashLog=null;
 function logSplash(msg,color){if(splashLog){splashLog.style.color=color||‘var(–amber)’;splashLog.textContent=msg}console.log(’[CFD]’,msg)}
+async // Map Yahoo symbol → Stooq symbol for fallback
+function toStooq(sym){
+var m={
+‘EURUSD=X’:‘eurusd’,‘GBPUSD=X’:‘gbpusd’,‘JPY=X’:‘usdjpy’,‘CHF=X’:‘usdchf’,
+‘AUDUSD=X’:‘audusd’,‘NZDUSD=X’:‘nzdusd’,‘EURGBP=X’:‘eurgbp’,‘EURJPY=X’:‘eurjpy’,
+‘GBPJPY=X’:‘gbpjpy’,‘EURCHF=X’:‘eurchf’,‘CAD=X’:‘usdcad’,‘AUDJPY=X’:‘audjpy’,
+‘GC=F’:‘gc.f’,‘BZ=F’:‘bz.f’,‘CL=F’:‘cl.f’,‘SI=F’:‘si.f’,
+‘BTC-USD’:‘btc-usd’,‘ETH-USD’:‘eth-usd’,
+‘AAPL’:‘aapl.us’,‘MSFT’:‘msft.us’,‘GOOGL’:‘googl.us’,‘TSLA’:‘tsla.us’,
+‘NVDA’:‘nvda.us’,‘AMZN’:‘amzn.us’,‘META’:‘meta.us’,‘AMD’:‘amd.us’,
+‘NFLX’:‘nflx.us’,‘JPM’:‘jpm.us’,‘V’:‘v.us’,
+‘^GSPC’:’%5Espx’,’%5EGSPC’:’%5Espx’,’^NDX’:’%5Endx’,’^DJI’:’%5Edji’
+};
+return m[sym]||null;
+}
+
+// Parse Stooq CSV → candles array
+function parseStooq(csv){
+try{
+var lines=csv.trim().split(’\n’);
+if(lines.length<3)return null;
+var candles=[];
+// Header: Date,Open,High,Low,Close,Volume
+for(var i=1;i<lines.length;i++){
+var p=lines[i].split(’,’);
+if(p.length<5)continue;
+var o=parseFloat(p[1]),h=parseFloat(p[2]),l=parseFloat(p[3]),cl=parseFloat(p[4]),v=parseFloat(p[5])||0;
+if(isNaN(o)||isNaN(cl)||cl===0)continue;
+candles.push({t:p[0],o:o,h:h,l:l,c:cl,v:v});
+}
+// Stooq returns newest first — reverse
+candles.reverse();
+return candles.length>5?candles:null;
+}catch(e){return null}
+}
+
+// Yahoo v7 URL (different endpoint, sometimes works when v8 blocked)
+function yfV7url(sym,intv,range){
+return ‘https://query2.finance.yahoo.com/v8/finance/chart/’+encodeURIComponent(sym)
++’?interval=’+intv+’&range=’+range+’&includePrePost=false&events=div%2Csplit’;
+}
+
+// Stooq URL for daily data
+function stooqUrl(stSym){
+var today=new Date();
+var from=new Date(today);from.setFullYear(from.getFullYear()-1);
+function fmt(d){return d.getFullYear()+(‘0’+(d.getMonth()+1)).slice(-2)+(‘0’+d.getDate()).slice(-2)}
+return ‘https://stooq.com/q/d/l/?s=’+stSym+’&d1=’+fmt(from)+’&d2=’+fmt(today)+’&i=d’;
+}
+
 async function yf(sym,intv,range){
-var base=‘https://query1.finance.yahoo.com/v8/finance/chart/’+encodeURIComponent(sym)+’?interval=’+intv+’&range=’+range+’&includePrePost=false’;
-if(wp>=0){try{var r=await ft(PX[wp](base),8000);if(r&&r.ok){var t=await r.text();try{var d=JSON.parse(t);var p=pY(d);if(p&&p.length>0)return p}catch(e){}}
-}catch(e){}wp=-1;}
-try{var r0=await ft(base,4000);if(r0&&r0.ok){var d0=await r0.json();var p0=pY(d0);if(p0&&p0.length>0){return p0}}}catch(e){}
+// ── Build URLs ─────────────────────────────────────────
+var v8=‘https://query1.finance.yahoo.com/v8/finance/chart/’+encodeURIComponent(sym)
++’?interval=’+intv+’&range=’+range+’&includePrePost=false’;
+var v7=yfV7url(sym,intv,range);
+
+// ── 1. Cached working proxy (fastest) ──────────────────
+if(wp>=0){
+try{
+var rc=await ft(PX[wp](v8),7000);
+if(rc&&rc.ok){var tc=await rc.text();try{var dc=JSON.parse(tc);var pc=pY(dc);if(pc&&pc.length>0)return pc}catch(e){}}
+}catch(e){}
+wp=-1;
+}
+
+// ── 2. Direct Yahoo (works in some browsers/contexts) ──
+try{
+var r0=await ft(v8,5000);
+if(r0&&r0.ok){var d0=await r0.json();var p0=pY(d0);if(p0&&p0.length>0)return p0}
+}catch(e){}
+
+// ── 3. Try all proxies with v8 + v7 simultaneously ─────
 for(var i=0;i<PX.length;i++){
-try{logSplash(‘Proxy ‘+(i+1)+’/’+PX.length+’…’);var r2=await ft(PX[i](base),9000);
-if(r2&&r2.ok){var t2=await r2.text();var d2;try{d2=JSON.parse(t2)}catch(e){continue}var p2=pY(d2);if(p2&&p2.length>0){wp=i;logSplash(‘Proxy ‘+(i+1)+’ OK!’,‘var(–green)’);return p2}}
-}catch(e){continue}}
+// Try v8
+try{
+if(typeof logSplash===‘function’)logSplash(‘Proxy ‘+(i+1)+’/’+PX.length+’…’);
+var r2=await ft(PX[i](v8),8000);
+if(r2&&r2.ok){
+var t2=await r2.text();
+try{var d2=JSON.parse(t2);var p2=pY(d2);if(p2&&p2.length>0){wp=i;return p2}}catch(e){}
+}
+}catch(e){}
+// Try v7 via same proxy
+try{
+var r3=await ft(PX[i](v7),8000);
+if(r3&&r3.ok){
+var t3=await r3.text();
+try{var d3=JSON.parse(t3);var p3=pY(d3);if(p3&&p3.length>0){wp=i;return p3}}catch(e){}
+}
+}catch(e){}
+}
+
+// ── 4. Stooq fallback (only for daily, for supported symbols) ──
+if(intv===‘1d’||intv===‘d’){
+var stSym=toStooq(sym);
+if(stSym){
+if(typeof logSplash===‘function’)logSplash(‘Stooq…’);
+var stUrl=stooqUrl(stSym);
+for(var j=0;j<PX.length;j++){
+try{
+var rs=await ft(PX[j](stUrl),8000);
+if(rs&&rs.ok){
+var csvText=await rs.text();
+var stData=parseStooq(csvText);
+if(stData&&stData.length>10){
+if(typeof logSplash===‘function’)logSplash(‘Stooq OK!’,‘var(–green)’);
+return stData;
+}
+}
+}catch(e){}
+}
+}
+}
+
 return null;
 }
 function ft(u,ms){return Promise.race([fetch(u,{method:‘GET’,mode:‘cors’,cache:‘no-store’}),new Promise(function(_,r){setTimeout(function(){r(new Error(‘timeout’))},ms)})])}
 function pY(j){
-try{var r=j.chart.result[0],ts=r.timestamp,q=r.indicators.quote[0];if(!ts||!q.close)return null;
+try{
+if(!j||!j.chart||!j.chart.result||!j.chart.result[0])return null;
+var r=j.chart.result[0],ts=r.timestamp,q=r.indicators.quote[0];
+if(!ts||!q||!q.close)return null;
 var c=[];for(var i=0;i<ts.length;i++){if(q.close[i]==null)continue;c.push({date:new Date(ts[i]*1000).toISOString().split(‘T’)[0],o:q.open[i]||q.close[i],h:q.high[i]||q.close[i],l:q.low[i]||q.close[i],c:q.close[i],v:q.volume?(q.volume[i]||0):0})}return c}catch(e){return null}
 }
 function launchApp(){
@@ -762,13 +873,15 @@ if(‘serviceWorker’ in navigator){
 try{var regs=await navigator.serviceWorker.getRegistrations();for(var i=0;i<regs.length;i++)await regs[i].unregister()}catch(e){}
 }
 try{
-var d=await yf(‘AAPL’,‘1d’,‘5d’);
-if(d&&d.length>0){logSplash(‘Conectado!’,‘var(–green)’);setTimeout(launchApp,300);return}
-logSplash(‘A tentar alternativa…’,‘var(–amber)’);
-var d2=await yf(‘BTC-USD’,‘1d’,‘5d’);
-if(d2&&d2.length>0){logSplash(‘Conectado!’,‘var(–green)’);setTimeout(launchApp,300);return}
-var d3=await yf(‘EURUSD=X’,‘1d’,‘5d’);
-if(d3&&d3.length>0){logSplash(‘Conectado!’,‘var(–green)’);setTimeout(launchApp,300);return}
+// Test connectivity with multiple symbols and approaches
+var testSyms=[‘EURUSD=X’,‘AAPL’,‘BTC-USD’,‘GC=F’,‘GBPUSD=X’];
+var connected=false;
+for(var ti=0;ti<testSyms.length&&!connected;ti++){
+logSplash(‘A ligar (’+(ti+1)+’/’+testSyms.length+’)…’,‘var(–amber)’);
+var td=await yf(testSyms[ti],‘1d’,‘5d’);
+if(td&&td.length>0){connected=true;logSplash(‘Conectado via ‘+testSyms[ti]+’!’,‘var(–green)’);setTimeout(launchApp,300);}
+}
+if(connected)return;
 }catch(e){console.error(’[CFD] startApp:’,e)}
 logSplash(‘Sem ligação – usa o modo offline ou verifica a internet.’,‘var(–red)’);
 st.innerHTML+=’<br><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center">’
