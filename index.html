@@ -510,7 +510,7 @@ var ROTATION_LIST=[
 
 async function quickAnalyze(sym){
 try{
-var candles=await yf(sym,'1d','6mo');
+var candles=await Promise.race([yf(sym,'1d','3mo'),new Promise(function(res){setTimeout(function(){res(null)},12000)})]);
 if(!candles||candles.length<40)return{sym:sym,signal:'WAIT',adx:null,bias:'Neutro'};
 var s20=iSMA(candles,20),s50=iSMA(candles,50),rsi=iRSI(candles),
 macd=iMACD(candles),boll=iBOLL(candles),atr=iATR(candles),adx=iADX(candles);
@@ -521,8 +521,8 @@ var savedMode=MODE;MODE='cfds';
 var entry=checkEntry(li,candles,s20,s50,rsi,adx,atr,macd,boll,null);
 MODE=savedMode;
 var signal=(entry&&entry.type)?entry.type:'WAIT';
-return{sym:sym,signal:signal,adx:lastAdx,bias:tf.bias};
-}catch(e){return{sym:sym,signal:'WAIT',adx:null,bias:'Neutro'}}
+return{sym:sym,signal:signal,adx:lastAdx,bias:tf.bias||'--'};
+}catch(e){return{sym:sym,signal:'WAIT',adx:null,bias:'--'}}
 }
 
 async function renderRotation(){
@@ -584,6 +584,7 @@ function updateHeader(){
     hEl.textContent='— analisados '+completed+'/'+others.length;
   } else {
     hEl.textContent=withSig.length>0?'— '+withSig.length+' com sinal ativo':'— todos laterais';
+    clearTimeout(rotGlobalTimer);
     // Sort cards: BUY/SELL first, then by ADX
     var grid=panel.querySelector('.rot-grid');
     if(grid){
@@ -619,14 +620,26 @@ function updateHeader(){
   }
 }
 
-// Analyze with timeout per asset (max 10s each)
+// Global 15s deadline — force render even if some assets never respond
+var rotGlobalTimer=setTimeout(function(){
+  others.forEach(function(r){
+    if(!results.find(function(x){return x.sym===r.s})){
+      var fb={sym:r.s,signal:'WAIT',adx:null,bias:'--'};
+      results.push(fb); completed++;
+      updateCard(r,fb);
+    }
+  });
+  updateHeader();
+},15000);
+
+// Analyze with timeout per asset (max 12s each)
 others.forEach(function(r){
   var timeoutId;
   var done=false;
   var timeout=new Promise(function(resolve){
     timeoutId=setTimeout(function(){
-      if(!done){done=true;resolve({sym:r.s,signal:'WAIT',adx:null,bias:'—'});}
-    },10000);
+      if(!done){done=true;resolve({sym:r.s,signal:'WAIT',adx:null,bias:'--'});}
+    },12000);
   });
   var analysis=quickAnalyze(r.s).then(function(res){
     if(!done){done=true;clearTimeout(timeoutId);}
@@ -905,6 +918,7 @@ function launchApp(){
 document.getElementById('splashScreen').style.display='none';
 document.getElementById('dashboard').classList.add('active');
 splashLog=null;initUI();refresh();
+renderSessions();
 }
 
 // open.er-api.com — free FX rates, no key, CORS open, works in private mode
@@ -1614,7 +1628,7 @@ function formatCalTime(dateStr){
   var d;
   if(dateStr.indexOf('.')>0){
     var parts=dateStr.replace('.','-').replace('.','-').split(' ');
-    d=new Date(parts[0]+'T'+(parts[1]||'00:00:00')+'Z');
+    d=new Date(parts[0]+'T'+(parts[1]||'00:00:00')); // local time, not UTC
   } else {
     d=new Date(dateStr);
   }
