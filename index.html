@@ -514,6 +514,10 @@ var candles=await Promise.race([yf(sym,'1d','3mo'),new Promise(function(res){set
 if(!candles||candles.length<40)return{sym:sym,signal:'WAIT',adx:null,bias:'Neutro'};
 var s20=iSMA(candles,20),s50=iSMA(candles,50),rsi=iRSI(candles),
 macd=iMACD(candles),boll=iBOLL(candles),atr=iATR(candles),adx=iADX(candles);
+var channel=iChannel(candles,60);
+window._lastChannel=channel;window._lastSel=sel;
+window._lastBoll=boll;window._lastRSI=rsi;
+if(boll&&boll.length>2){var pbi2=boll.length-2;while(pbi2>0&&boll[pbi2].u==null)pbi2--;window._lastBollPrev=boll[pbi2]||null;}
 var li=candles.length-1;
 var lastAdx=null;for(var i=adx.length-1;i>=0;i--){if(adx[i]!=null){lastAdx=adx[i];break}}
 var tf=analyzeTF(candles,'D');
@@ -529,136 +533,142 @@ async function renderRotation(){
 var panel=document.getElementById('rotPanel');
 if(!panel)return;
 
-// Check signal state
-var recText=(window._lastSignalType)||'';
-if(!recText){var recEl=document.getElementById('recValue');recText=recEl?recEl.textContent:'';}
-var isWaiting=(recText==='AGUARDAR');
-if(!isWaiting){panel.innerHTML='';return;}
-
-// Get rotation candidates (exclude current)
+// Show panel always — title adapts to current signal
+var curSig=window._lastSignalType||'';
 var others=ROTATION_LIST.filter(function(r){return r.s!==sel});
 if(!others.length){panel.innerHTML='';return;}
 
-// Show skeleton cards immediately
-function skelCard(r){
-  return '<div class="rot-card loading-card" id="rotcard-'+r.s.replace(/[^a-z0-9]/gi,'_')+'">'
+// Generation counter — cancel stale renders
+window._rotGen=(window._rotGen||0)+1;
+var myGen=window._rotGen;
+
+var titleLabel=curSig==='COMPRA'?'🔄 Outros Ativos <span class="rot-subtitle">— tens COMPRA em '+sel+'</span>'
+  :curSig==='VENDA'?'🔄 Outros Ativos <span class="rot-subtitle">— tens VENDA em '+sel+'</span>'
+  :'🔄 Rotação de Ativos <span class="rot-subtitle">— a analisar '+others.length+' ativos</span>';
+
+// Skeleton cards
+var skelHTML='<div class="rot-grid">';
+others.forEach(function(r){
+  skelHTML+='<div class="rot-card loading-card" id="rotcard-'+r.s.replace(/[^a-z0-9]/gi,'_')+'">'
     +'<div><div class="rot-name">'+r.e+' '+r.n+'</div>'
     +'<div class="rot-bias" style="color:var(--t3)">A analisar...</div></div>'
     +'<div style="text-align:right"><div class="rot-signal wait">⏳</div>'
     +'<div class="rot-adx" style="color:var(--t3)">--</div></div></div>';
-}
+});
+skelHTML+='</div>';
 
-var skelGrid='<div class="rot-grid">'+others.map(skelCard).join('')+'</div>';
 panel.innerHTML='<div class="rot-panel">'
-  +'<div class="rot-header"><div class="rot-title">🔄 Rotação de Ativos <span class="rot-subtitle">— a analisar '+others.length+' ativos</span></div></div>'
-  +skelGrid
+  +'<div class="rot-header"><div class="rot-title">'+titleLabel+'</div></div>'
+  +skelHTML
   +'</div>';
 
-// Analyze each asset individually and update its card as results come in
 var results=[];
 var completed=0;
 
 function updateCard(r,result){
-  var cardId='rotcard-'+r.s.replace(/[^a-z0-9]/gi,'_');
-  var cardEl=document.getElementById(cardId);
+  if(window._rotGen!==myGen)return; // stale render, abort
+  var cardEl=document.getElementById('rotcard-'+r.s.replace(/[^a-z0-9]/gi,'_'));
   if(!cardEl)return;
   var hasSig=result.signal==='BUY'||result.signal==='SELL';
   var adxOk=result.adx!=null&&result.adx>=20;
-  var cardClass=hasSig&&adxOk?'green':hasSig?'amber':'';
-  var sigClass=result.signal==='BUY'?'buy':result.signal==='SELL'?'sell':'wait';
-  var sigLabel=result.signal==='BUY'?'▲ COMPRA':result.signal==='SELL'?'▼ VENDA':'⏳ AGUARDAR';
-  var biasColor=result.bias==='Bullish'?'var(--green)':result.bias==='Bearish'?'var(--red)':'var(--t3)';
-  var adxTxt=result.adx!=null?(result.adx<20?'ADX '+result.adx.toFixed(0)+' lateral':result.adx>=25?'ADX '+result.adx.toFixed(0)+' forte':'ADX '+result.adx.toFixed(0)+' fraco'):'Sem dados';
-  cardEl.className='rot-card '+cardClass;
+  var cc=hasSig&&adxOk?'green':hasSig?'amber':'';
+  var sc=result.signal==='BUY'?'buy':result.signal==='SELL'?'sell':'wait';
+  var sl=result.signal==='BUY'?'▲ COMPRA':result.signal==='SELL'?'▼ VENDA':'— AGUARDAR';
+  var bc=result.bias==='Bullish'?'var(--green)':result.bias==='Bearish'?'var(--red)':'var(--t3)';
+  var adxTxt=result.adx==null?'Sem dados':result.adx<20?'ADX '+result.adx.toFixed(0)+' lateral':result.adx>=25?'ADX '+result.adx.toFixed(0)+' forte':'ADX '+result.adx.toFixed(0)+' fraco';
+  cardEl.className='rot-card '+cc;
+  cardEl.onclick=(function(sym){return function(){selA(sym)}})(r.s);
   cardEl.innerHTML='<div><div class="rot-name">'+r.e+' '+r.n+'</div>'
-    +'<div class="rot-bias" style="color:'+biasColor+'">'+result.bias+'</div></div>'
-    +'<div style="text-align:right"><div class="rot-signal '+sigClass+'">'+sigLabel+'</div>'
+    +'<div class="rot-bias" style="color:'+bc+'">'+result.bias+'</div></div>'
+    +'<div style="text-align:right"><div class="rot-signal '+sc+'">'+sl+'</div>'
     +'<div class="rot-adx">'+adxTxt+'</div></div>';
 }
 
-function updateHeader(){
+function finalSort(){
+  if(window._rotGen!==myGen)return;
   var withSig=results.filter(function(r){return r.signal==='BUY'||r.signal==='SELL'});
-  var hEl=panel.querySelector('.rot-subtitle');
-  if(!hEl)return;
-  if(completed<others.length){
-    hEl.textContent='— analisados '+completed+'/'+others.length;
-  } else {
-    hEl.textContent=withSig.length>0?'— '+withSig.length+' com sinal ativo':'— todos laterais';
-    clearTimeout(rotGlobalTimer);
-    // Sort cards: BUY/SELL first, then by ADX
-    var grid=panel.querySelector('.rot-grid');
-    if(grid){
-      var sorted=results.slice().sort(function(a,b){
-        var aHas=(a.signal==='BUY'||a.signal==='SELL')?1:0;
-        var bHas=(b.signal==='BUY'||b.signal==='SELL')?1:0;
-        if(aHas!==bHas)return bHas-aHas;
-        return(b.adx||0)-(a.adx||0);
-      });
-      // Re-render grid in sorted order
-      var newGrid='<div class="rot-grid">';
-      sorted.forEach(function(res){
-        var r=others.find(function(o){return o.s===res.sym});
-        if(!r)return;
-        var hasSig=res.signal==='BUY'||res.signal==='SELL';
-        var adxOk=res.adx!=null&&res.adx>=20;
-        var cc=hasSig&&adxOk?'green':hasSig?'amber':'';
-        var sc=res.signal==='BUY'?'buy':res.signal==='SELL'?'sell':'wait';
-        var sl=res.signal==='BUY'?'▲ COMPRA':res.signal==='SELL'?'▼ VENDA':'⏳ AGUARDAR';
-        var bc=res.bias==='Bullish'?'var(--green)':res.bias==='Bearish'?'var(--red)':'var(--t3)';
-        var at=res.adx!=null?(res.adx<20?'ADX '+res.adx.toFixed(0)+' lateral':res.adx>=25?'ADX '+res.adx.toFixed(0)+' forte':'ADX '+res.adx.toFixed(0)+' fraco'):'Sem dados';
-        newGrid+='<div class="rot-card '+cc+'" onclick="selA(this.dataset.sym)" data-sym="'+res.sym+'">'
-          +'<div><div class="rot-name">'+r.e+' '+r.n+'</div>'
-          +'<div class="rot-bias" style="color:'+bc+'">'+res.bias+'</div></div>'
-          +'<div style="text-align:right"><div class="rot-signal '+sc+'">'+sl+'</div>'
-          +'<div class="rot-adx">'+at+'</div></div></div>';
-      });
-      newGrid+='</div>';
-      var tip='<div class="rot-tip">💡 Opera o ativo com sinal + ADX forte. Se todos aguardam, fica fora — paciência é gestão de risco.</div>';
-      var oldGrid=panel.querySelector('.rot-grid');
-      if(oldGrid){oldGrid.outerHTML=newGrid+tip;}
+  var subtitle=document.querySelector('#rotPanel .rot-subtitle');
+  if(subtitle){
+    if(curSig==='COMPRA'||curSig==='VENDA'){
+      subtitle.textContent='— '+sel+': '+curSig+(withSig.length?' · '+withSig.length+' outros com sinal':'');
+    } else {
+      subtitle.textContent=withSig.length>0?'— '+withSig.length+' com sinal':'— todos laterais';
     }
   }
+  // Sort and re-render grid
+  var sorted=results.slice().sort(function(a,b){
+    var aH=(a.signal==='BUY'||a.signal==='SELL')?1:0;
+    var bH=(b.signal==='BUY'||b.signal==='SELL')?1:0;
+    if(aH!==bH)return bH-aH;
+    return(b.adx||0)-(a.adx||0);
+  });
+  var grid=panel.querySelector('.rot-grid');
+  if(!grid)return;
+  var newGrid='<div class="rot-grid">';
+  sorted.forEach(function(res){
+    var r=others.find(function(o){return o.s===res.sym});
+    if(!r)return;
+    var hasSig=res.signal==='BUY'||res.signal==='SELL';
+    var adxOk=res.adx!=null&&res.adx>=20;
+    var cc=hasSig&&adxOk?'green':hasSig?'amber':'';
+    var sc=res.signal==='BUY'?'buy':res.signal==='SELL'?'sell':'wait';
+    var sl=res.signal==='BUY'?'▲ COMPRA':res.signal==='SELL'?'▼ VENDA':'— AGUARDAR';
+    var bc=res.bias==='Bullish'?'var(--green)':res.bias==='Bearish'?'var(--red)':'var(--t3)';
+    var at=res.adx==null?'Sem dados':res.adx<20?'ADX '+res.adx.toFixed(0)+' lateral':res.adx>=25?'ADX '+res.adx.toFixed(0)+' forte':'ADX '+res.adx.toFixed(0)+' fraco';
+    newGrid+='<div class="rot-card '+cc+'" data-sym="'+res.sym+'" onclick="selA(this.getAttribute(\'data-sym\'))" style="cursor:pointer">'
+      +'<div><div class="rot-name">'+r.e+' '+r.n+'</div>'
+      +'<div class="rot-bias" style="color:'+bc+'">'+res.bias+'</div></div>'
+      +'<div style="text-align:right"><div class="rot-signal '+sc+'">'+sl+'</div>'
+      +'<div class="rot-adx">'+at+'</div></div></div>';
+  });
+  newGrid+='</div>';
+  newGrid+='<div class="rot-tip">💡 Clica num ativo para analisar. Prioriza sinais com ADX forte.</div>';
+  grid.outerHTML=newGrid+'<div class="rot-tip">💡 Clica num ativo para analisar. Prioriza sinais com ADX forte.</div>';
 }
 
-// Global 15s deadline — force render even if some assets never respond
-var rotGlobalTimer=setTimeout(function(){
+// Global deadline: 20s — force final render
+var rotDeadline=setTimeout(function(){
+  if(window._rotGen!==myGen)return;
   others.forEach(function(r){
     if(!results.find(function(x){return x.sym===r.s})){
       var fb={sym:r.s,signal:'WAIT',adx:null,bias:'--'};
-      results.push(fb); completed++;
+      results.push(fb);completed++;
       updateCard(r,fb);
     }
   });
-  updateHeader();
-},15000);
+  finalSort();
+},20000);
 
-// Analyze with timeout per asset (max 12s each)
+// Analyze each asset — 8s timeout per asset
 others.forEach(function(r){
-  var timeoutId;
   var done=false;
-  var timeout=new Promise(function(resolve){
-    timeoutId=setTimeout(function(){
-      if(!done){done=true;resolve({sym:r.s,signal:'WAIT',adx:null,bias:'--'});}
-    },12000);
-  });
-  var analysis=quickAnalyze(r.s).then(function(res){
-    if(!done){done=true;clearTimeout(timeoutId);}
-    return res;
+  var perTimer=setTimeout(function(){
+    if(done)return; done=true;
+    var fb={sym:r.s,signal:'WAIT',adx:null,bias:'--'};
+    results.push(fb);completed++;
+    updateCard(r,fb);
+    if(completed>=others.length){clearTimeout(rotDeadline);finalSort();}
+  },8000);
+
+  quickAnalyze(r.s).then(function(res){
+    if(done)return; done=true;
+    clearTimeout(perTimer);
+    if(!res)res={sym:r.s,signal:'WAIT',adx:null,bias:'--'};
+    res.sym=r.s;
+    results.push(res);completed++;
+    updateCard(r,res);
+    if(completed>=others.length){clearTimeout(rotDeadline);finalSort();}
   }).catch(function(){
-    clearTimeout(timeoutId);
-    return{sym:r.s,signal:'WAIT',adx:null,bias:'—'};
-  });
-  Promise.race([analysis,timeout]).then(function(result){
-    result.sym=r.s;
-    results.push(result);
-    completed++;
-    updateCard(r,result);
-    updateHeader();
+    if(done)return; done=true;
+    clearTimeout(perTimer);
+    var fb={sym:r.s,signal:'WAIT',adx:null,bias:'--'};
+    results.push(fb);completed++;
+    updateCard(r,fb);
+    if(completed>=others.length){clearTimeout(rotDeadline);finalSort();}
   });
 });
 
 }
-
 
 var XTB_SPREADS={
   'AAPL':0.08,'MSFT':0.10,'GOOGL':0.30,'TSLA':0.15,'NVDA':0.12,'AMZN':0.20,
@@ -1062,6 +1072,131 @@ if((momPct>0.5&&trdPct>0.5&&direction>1)||(momPct>0.5&&trdPct>0.5&&direction<-1)
 return{score:score,direction:direction,categories:{m:Math.round(momPct*100),t:Math.round(trdPct*100),v:Math.round(volPct*100),vl:Math.round(vlmPct*100)},reasons:mom.reasons.concat(trd.reasons,vol.reasons,vlm.reasons),adxv:adxv};
 }
 
+
+/* ═══ CHANNEL/TREND STRUCTURE ANALYSIS ═══ */
+function iChannel(c,n){
+  // Linear regression over last n candles (highs for top, lows for bottom)
+  var data=c.slice(-n);
+  var len=data.length;
+  if(len<10)return null;
+  
+  // Linear regression on closes
+  var sumX=0,sumY=0,sumXY=0,sumX2=0;
+  for(var i=0;i<len;i++){
+    sumX+=i; sumY+=data[i].c;
+    sumXY+=i*data[i].c; sumX2+=i*i;
+  }
+  var m=(len*sumXY-sumX*sumY)/(len*sumX2-sumX*sumX);
+  var b=(sumY-m*sumX)/len;
+  
+  // ATR-based channel width
+  var atrArr=[];
+  for(var j=1;j<len;j++){
+    var tr=Math.max(data[j].h-data[j].l,
+      Math.abs(data[j].h-data[j-1].c),
+      Math.abs(data[j].l-data[j-1].c));
+    atrArr.push(tr);
+  }
+  var avgATR=atrArr.reduce(function(s,v){return s+v},0)/atrArr.length;
+  
+  // Channel lines at current bar
+  var curX=len-1;
+  var midLine=m*curX+b;
+  var slope=m; // per bar
+  var slopeAnnual=m*252; // annual drift
+  
+  // Max deviation from regression line
+  var devsHigh=[],devsLow=[];
+  for(var k=0;k<len;k++){
+    var mid=m*k+b;
+    devsHigh.push(data[k].h-mid);
+    devsLow.push(mid-data[k].l);
+  }
+  var chanTop=midLine+Math.max.apply(null,devsHigh)*0.9;
+  var chanBot=midLine-Math.max.apply(null,devsLow)*0.9;
+  
+  var price=c[c.length-1].c;
+  var chanRange=chanTop-chanBot;
+  var posInChan=chanRange>0?(price-chanBot)/chanRange:0.5; // 0=bottom, 1=top
+  
+  // Trend strength: angle in normalized terms
+  var trendPct=Math.abs(slopeAnnual/price*100); // % per year
+  var trendDir=slope>0?'Ascendente':'Descendente';
+  if(Math.abs(slope)<avgATR*0.01)trendDir='Lateral';
+  
+  // Position interpretation
+  var posLabel=posInChan<0.2?'Junto ao suporte do canal':
+    posInChan>0.8?'Junto à resistência do canal':
+    posInChan<0.4?'Terço inferior do canal':
+    posInChan>0.6?'Terço superior do canal':'Centro do canal';
+    
+  var signal=null;
+  if(trendDir==='Descendente'&&posInChan<0.2) signal={dir:'VENDA',reason:'Canal descendente + preço no suporte (possível short)'};
+  else if(trendDir==='Ascendente'&&posInChan<0.2) signal={dir:'COMPRA',reason:'Canal ascendente + pullback ao suporte'};
+  else if(trendDir==='Ascendente'&&posInChan>0.8) signal={dir:'AGUARDAR',reason:'Junto à resistência — aguarda pullback'};
+  else if(trendDir==='Descendente'&&posInChan>0.8) signal={dir:'AGUARDAR',reason:'Junto à resistência — possível short mas aguarda confirmação'};
+
+  return{
+    trend:trendDir,
+    slope:slope,
+    trendPct:trendPct.toFixed(1),
+    midLine:midLine,
+    chanTop:chanTop,
+    chanBot:chanBot,
+    posInChan:posInChan,
+    posLabel:posLabel,
+    signal:signal,
+    avgATR:avgATR
+  };
+}
+
+function renderChannelCard(ch,price,sym){
+  if(!ch)return'';
+  var tColor=ch.trend==='Ascendente'?'var(--green)':ch.trend==='Descendente'?'var(--red)':'var(--t3)';
+  var tIcon=ch.trend==='Ascendente'?'↗':'↘';
+  if(ch.trend==='Lateral'){tIcon='→';tColor='var(--t3)';}
+  
+  var pct=Math.round(ch.posInChan*100);
+  // Progress bar color
+  var barColor=pct<25?'var(--green)':pct>75?'var(--red)':'var(--blue)';
+  
+  var sigHTML='';
+  if(ch.signal){
+    var sigColor=ch.signal.dir==='COMPRA'?'var(--green)':ch.signal.dir==='VENDA'?'var(--red)':'var(--amber)';
+    sigHTML='<div style="margin-top:8px;padding:6px 8px;border-radius:6px;background:rgba(255,255,255,.04);border-left:3px solid '+sigColor+';font-size:9px;color:'+sigColor+'">'
+      +'<strong>'+ch.signal.dir+'</strong> · '+ch.signal.reason+'</div>';
+  }
+  
+  return '<div style="margin:10px 0;padding:10px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px">'
+    +'<div style="font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">📐 Estrutura de Canal</div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+    +'<div style="font-size:13px;font-weight:700;color:'+tColor+'">'+tIcon+' '+ch.trend+'</div>'
+    +'<div style="font-size:9px;color:var(--t3)">±'+ch.trendPct+'%/ano</div>'
+    +'</div>'
+    // Channel position bar
+    +'<div style="font-size:8px;color:var(--t3);margin-bottom:4px">Posição no canal</div>'
+    +'<div style="position:relative;height:8px;background:var(--bg);border-radius:4px;overflow:hidden;margin-bottom:4px">'
+    +'<div style="position:absolute;left:0;top:0;height:100%;width:'+pct+'%;background:'+barColor+';border-radius:4px;transition:width .4s"></div>'
+    +'</div>'
+    +'<div style="display:flex;justify-content:space-between;font-size:8px;color:var(--t3);margin-bottom:6px">'
+    +'<span>Suporte '+formatPrice(ch.chanBot,sym)+'</span>'
+    +'<span style="color:'+barColor+';font-weight:600">'+pct+'%</span>'
+    +'<span>Resist. '+formatPrice(ch.chanTop,sym)+'</span>'
+    +'</div>'
+    +'<div style="font-size:9px;color:var(--t2)">'+ch.posLabel+'</div>'
+    +sigHTML
+    +'</div>';
+}
+
+
+function formatPrice(p,sym){
+  if(!p||isNaN(p))return'--';
+  if(sym&&(sym.indexOf('JPY')>=0||sym==='JPY=X'||sym.indexOf('JPY=X')>=0))return p.toFixed(2);
+  if(p>1000)return p.toFixed(0);
+  if(p>10)return p.toFixed(2);
+  return p.toFixed(4);
+}
+
 /* ═══ SIGNAL ENGINE ═══ */
 function getATRMult(sym){var cat=getCategory(sym);return ATR_MULT[cat]||{sl:1.5,tp:3.0}}
 function getESMALeverage(sym){if(XTB_LEV_ESMA[sym]!=null)return XTB_LEV_ESMA[sym];var cat=getCategory(sym);return XTB_LEV[cat]||5}
@@ -1237,7 +1372,17 @@ if(pos.tp!=null){if((pos.type==='BUY'&&price>=pos.tp)||(pos.type==='SELL'&&price
 /* ═══ MAIN REFRESH ═══ */
 async function refresh(){
 var info=getI(sel);setSt('load',info.n+'…');document.getElementById('symbolName').textContent=info.e+' '+info.n;document.getElementById('priceDisplay').textContent='…';
-var candles=await yf(info.s,'1d','1y');if(!candles||candles.length<50){setSt('err','Sem dados -- '+info.s);return}
+var candles=await yf(info.s,'1d','1y');if(!candles||candles.length<50){
+  setSt('err','Sem dados -- '+info.s);
+  // Still show rotation panel so user can try another asset
+  document.getElementById('recValue').textContent='SEM DADOS';
+  document.getElementById('recValue').style.color='var(--t3)';
+  document.getElementById('recValue').style.fontSize='22px';
+  document.getElementById('modeLabel').textContent='MODO CFDs';
+  window._lastSignalType='AGUARDAR';
+  renderRotation();
+  return;
+}
 var weekly=await yf(info.s,'1wk','2y');
 var s20=iSMA(candles,20),s50=iSMA(candles,50),rsi=iRSI(candles),macd=iMACD(candles),boll=iBOLL(candles),fib=iFIB(candles),sr=iSR(candles),atr=iATR(candles),adx=iADX(candles);
 var ema200=iEMA200(candles);
@@ -2130,7 +2275,13 @@ function renderCalendar(){
     h+='</div>'; // cal-day
   });
   
-  wrap.innerHTML=h;
+  // Prepend static data warning if needed
+  if(window._calIsStatic){
+    var staticBanner='<div style="padding:6px 10px;background:rgba(255,190,11,.06);border:1px solid rgba(255,190,11,.15);border-radius:7px;font-size:8px;color:var(--amber);margin-bottom:8px">'+'⚠️ Dados em tempo real indisponíveis — eventos típicos desta semana. Valores de referência, não reais.</div>';
+    wrap.innerHTML=staticBanner+h;
+  } else {
+    wrap.innerHTML=h;
+  }
 }
 
 function toggleCalFilter(type){
@@ -2192,13 +2343,8 @@ async function loadCalendar(force){
   calData=data;
   calLoaded=true;
   var isStatic=!data[0]||data[0]._static;
-  if(isStatic&&wrap){
-    var banner=document.createElement('div');
-    banner.style.cssText='padding:6px 10px;background:rgba(255,190,11,.06);border:1px solid rgba(255,190,11,.15);border-radius:7px;font-size:8px;color:var(--amber);margin-bottom:8px';
-    banner.textContent='⚠️ Dados em tempo real indisponíveis — a mostrar eventos recorrentes típicos desta semana (valores de referência). Forecast/Anterior são estimativas baseadas em médias históricas.';
-    wrap.innerHTML='';
-    wrap.appendChild(banner);
-  }
+  // Set a flag so renderCalendar prepends the static warning banner
+  window._calIsStatic = isStatic;
   renderCalendar();
 }
 
@@ -2333,8 +2479,78 @@ var pts='';vis.forEach(function(v,i){if(v!=null)pts+=x(i)+','+y(v)+' '});sg.appe
 function drawMACD(macd){var W=800,H=70,vis={m:macd.ml.slice(-60),s:macd.sl.slice(-60),h:macd.h.slice(-60)};var all=vis.m.concat(vis.s,vis.h).filter(function(v){return v!=null});if(!all.length)return;var am=Math.max(Math.abs(Math.min.apply(null,all)),Math.abs(Math.max.apply(null,all)))||1;var x=function(i){return 6+(i/(vis.m.length-1))*(W-54)},y=function(v){return 35-(v/am)*28},bw=Math.max(1.5,(W-54)/vis.h.length*.5);var sg=sv('svg',{viewBox:'0 0 '+W+' '+H});sg.appendChild(sv('rect',{width:W,height:H,fill:'#080c14',rx:8}));sg.appendChild(sv('line',{x1:6,x2:W-48,y1:35,y2:35,stroke:'#141c2c'}));vis.h.forEach(function(v,i){if(v!=null)sg.appendChild(sv('rect',{x:x(i)-bw/2,y:v>=0?y(v):35,width:bw,height:Math.abs(y(v)-35),fill:v>=0?'rgba(0,230,138,.3)':'rgba(255,71,87,.3)',rx:.5}))});var mp='',sp='';vis.m.forEach(function(v,i){if(v!=null)mp+=x(i)+','+y(v)+' '});vis.s.forEach(function(v,i){if(v!=null)sp+=x(i)+','+y(v)+' '});sg.appendChild(sv('polyline',{points:mp,fill:'none',stroke:'#818cf8','stroke-width':1.3}));sg.appendChild(sv('polyline',{points:sp,fill:'none',stroke:'#f97316','stroke-width':1.3}));document.getElementById('chartMACD').innerHTML='';document.getElementById('chartMACD').appendChild(sg)}
 
 /* ═══ RENDER FUNCTIONS ═══ */
+
+function renderBBRSICard(){
+  // Read latest values from globals
+  var boll=window._lastBoll, rsi=window._lastRSI, price=curDP?curDP.c:null;
+  if(!boll||!rsi||!price)return'';
+  
+  var li=boll.length-1;
+  // Find last valid boll
+  while(li>0&&boll[li].u==null)li--;
+  var b=boll[li];
+  if(!b||b.u==null)return'';
+  
+  // Find last RSI
+  var ri=rsi.length-1;
+  while(ri>0&&rsi[ri]==null)ri--;
+  var rsiv=rsi[ri];
+  if(rsiv==null)return'';
+  
+  var bbW=b.u-b.l;
+  var bbPct=bbW>0?(price-b.l)/bbW:0.5; // 0=lower band, 1=upper band
+  var bbPos=bbPct<0.1?'Abaixo BB inferior':bbPct<0.25?'Junto à BB inferior':
+    bbPct>0.9?'Acima BB superior':bbPct>0.75?'Junto à BB superior':'Entre BBs (neutro)';
+  var bbColor=bbPct<0.25?'var(--green)':bbPct>0.75?'var(--red)':'var(--t3)';
+  
+  var rsiState=rsiv<30?'Sobrevendido (RSI '+rsiv.toFixed(0)+')':
+    rsiv>70?'Sobrecomprado (RSI '+rsiv.toFixed(0)+')':
+    rsiv<40?'Zona de compra (RSI '+rsiv.toFixed(0)+')':
+    rsiv>60?'Zona de venda (RSI '+rsiv.toFixed(0)+')':
+    'Neutro (RSI '+rsiv.toFixed(0)+')';
+  var rsiColor=rsiv<30?'var(--green)':rsiv>70?'var(--red)':rsiv<40?'var(--green)':rsiv>60?'var(--red)':'var(--t3)';
+  
+  // BB squeeze detection
+  var squeezeNote='';
+  if(window._lastBollPrev){
+    var bprev=window._lastBollPrev;
+    var prevW=(bprev.u-bprev.l);
+    if(bbW<prevW*0.7)squeezeNote='<div style="font-size:8px;color:var(--amber);margin-top:4px">⚡ BB Squeeze — movimento explosivo iminente</div>';
+  }
+  
+  return '<div style="margin:0 0 10px 0;padding:10px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px">'
+    +'<div style="font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">📊 Bollinger Bands + RSI</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    // BB
+    +'<div><div style="font-size:8px;color:var(--t3);margin-bottom:3px">Bollinger Bands</div>'
+    +'<div style="position:relative;height:6px;background:var(--bg);border-radius:3px;overflow:hidden;margin-bottom:3px">'
+    +'<div style="position:absolute;left:0;top:0;height:100%;width:'+Math.round(Math.min(100,Math.max(0,bbPct*100)))+'%;background:'+bbColor+';border-radius:3px"></div>'
+    +'</div>'
+    +'<div style="font-size:9px;color:'+bbColor+';font-weight:600">'+bbPos+'</div>'
+    +'<div style="font-size:8px;color:var(--t3);margin-top:2px">Sup '+b.l.toFixed(curDP&&curDP.c>10?2:4)+' · Res '+b.u.toFixed(curDP&&curDP.c>10?2:4)+'</div>'
+    +'</div>'
+    // RSI
+    +'<div><div style="font-size:8px;color:var(--t3);margin-bottom:3px">RSI (14)</div>'
+    +'<div style="position:relative;height:6px;background:var(--bg);border-radius:3px;overflow:hidden;margin-bottom:3px">'
+    +'<div style="position:absolute;left:0;top:0;height:100%;width:'+rsiv.toFixed(0)+'%;background:'+rsiColor+';border-radius:3px"></div>'
+    +'</div>'
+    +'<div style="font-size:9px;color:'+rsiColor+';font-weight:600">'+rsiState+'</div>'
+    +'</div>'
+    +'</div>'
+    +squeezeNote
+    +'</div>';
+}
+
 function renderSigs(sigs){
-var dp=curDP;var h='<div style="font-size:8px;color:var(--t3);margin-bottom:8px;text-transform:uppercase">'+sigs.length+' sinais ('+MODE+') · Mom'+WEIGHTS.momentum+'% Tend'+WEIGHTS.trend+'% Vol'+WEIGHTS.volatility+'% Vlm'+WEIGHTS.volume+'%</div>';
+var dp=curDP;
+// Channel card at top
+var ch=window._lastChannel;
+var chSym=window._lastSel||sel;
+var h='';
+if(ch){h+=renderChannelCard(ch,dp?dp.c:0,chSym);}
+// BB + RSI context card
+h+=renderBBRSICard();
+h+='<div style="font-size:8px;color:var(--t3);margin-bottom:8px;text-transform:uppercase">'+sigs.length+' sinais ('+MODE+') · Mom'+WEIGHTS.momentum+'% Tend'+WEIGHTS.trend+'% Vol'+WEIGHTS.volatility+'% Vlm'+WEIGHTS.volume+'%</div>';
 sigs.slice(-12).reverse().forEach(function(s){var buy=s.type==='BUY',c=buy?'var(--green)':'var(--red)',bg=buy?'rgba(0,230,138,.06)':'rgba(255,71,87,.06)';
 h+='<div class="signal-card" style="border-left:2px solid '+c+'"><div class="signal-header"><div style="display:flex;align-items:center;gap:7px"><span class="signal-type" style="background:'+bg+';color:'+c+'">'+(buy?'▲ LONG':'▼ SHORT')+'</span><span style="font-size:10px;color:var(--t2)">'+s.price.toFixed(dp)+'</span><span style="font-size:8px;color:var(--amber)">R:R 1:'+s.rr+'</span></div><span style="font-size:8px;color:var(--t3)">'+s.date+'</span></div>';
 if(s.sl!=null)h+='<div style="font-size:8px;margin-top:4px;color:var(--t3)">SL:<span style="color:var(--red)">'+s.sl.toFixed(dp)+'</span> TP:<span style="color:var(--green)">'+s.tp.toFixed(dp)+'</span></div>';
@@ -2346,7 +2562,26 @@ function renderLvl(sr,fib,price,srStrong,confZones,candlePatterns,ema200){
 var dp=curDP;var h='<div class="levels-grid"><div class="level-box"><div class="level-title">Suporte & Resistência</div>';
 [{k:'sf',l:'Suporte Forte',g:1},{k:'su',l:'Suporte',g:1},{k:'re',l:'Resistência',g:0},{k:'rf',l:'Resistência Forte',g:0}].forEach(function(it){h+='<div class="level-row"><span style="color:var(--t2)">'+it.l+'</span><span style="font-weight:600;color:'+(it.g?'var(--green)':'var(--red)')+'">'+sr[it.k].toFixed(dp)+'</span></div>'});
 h+='<div style="margin-top:8px;padding:7px 10px;background:rgba(91,127,255,.05);border-radius:7px;font-size:8px;color:var(--purple)">Preço: <b>'+price.toFixed(dp)+'</b></div></div>';
-h+='<div class="level-box"><div class="level-title">Fibonacci</div>';for(var l in fib)h+='<div class="level-row"><span style="color:var(--amber)">'+l+'</span><span style="font-weight:600">'+fib[l].toFixed(dp)+'</span></div>';h+='</div></div>';
+// Fibonacci with proximity indicator
+h+='<div class="level-box"><div class="level-title">Fibonacci Retracement</div>';
+var fibLevels=Object.keys(fib);
+var nearestFib=null,nearestDist=Infinity;
+fibLevels.forEach(function(l){
+  var dist=Math.abs(fib[l]-price)/price;
+  if(dist<0.005&&dist<nearestDist){nearestDist=dist;nearestFib=l;}
+});
+fibLevels.forEach(function(l){
+  var isNear=(l===nearestFib);
+  var fibPrice=fib[l];
+  var isRes=fibPrice>price,isSup=fibPrice<price;
+  var col=isNear?'var(--amber)':isRes?'var(--red)':'var(--green)';
+  var badge=isNear?' <span style="background:var(--amber);color:#000;border-radius:3px;padding:1px 4px;font-size:7px;font-weight:700">← PREÇO</span>':'';
+  h+='<div class="level-row" style="'+(isNear?'background:rgba(255,190,11,.08);border-radius:5px;padding:2px 4px;':'')+'"><span style="color:var(--amber)">'+l+'</span><span style="font-weight:700;color:'+col+'">'+fibPrice.toFixed(dp)+badge+'</span></div>';
+});
+if(nearestFib){
+  h+='<div style="margin-top:6px;padding:5px 8px;background:rgba(255,190,11,.06);border-radius:6px;font-size:8px;color:var(--amber)">📐 Preço junto ao nível Fib '+nearestFib+'</div>';
+}
+h+='</div></div>';
 // All S/R + candle + fundamental panels go INSIDE tabLevels
   var srH=srStrong?renderSRPanel(srStrong,confZones||[],candles_cache||[],ema200||[]):'';
   var cpH=candlePatterns?renderCandlePanel(candlePatterns,srStrong||{all:[]},price):'';
